@@ -185,6 +185,20 @@
     });
   }
 
-  window.__ccOverlay = { show };
+  // 짧은 안내 배너 (클릭 없음): 대상을 못 찾았을 때 등
+  function notice(text) {
+    if (host) unmount();
+    mount();
+    const banner = document.createElement('div');
+    banner.className = 'banner';
+    banner.setAttribute('role', 'status');
+    banner.innerHTML = `<div class="brand">동의 클리너</div><p class="title" style="font-size:15px">${esc(text)}</p>
+      <div class="btns"><button class="close">닫기</button></div>`;
+    root.appendChild(banner);
+    const timer = setTimeout(unmount, 10000);
+    banner.querySelector('.close').addEventListener('click', () => { clearTimeout(timer); unmount(); });
+  }
+
+  window.__ccOverlay = { show, notice };
   return 'ready';
 })();

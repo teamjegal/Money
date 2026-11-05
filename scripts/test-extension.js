@@ -29,12 +29,14 @@ const AD5 = ['cc-10', 'cc-11', 'cc-12', 'cc-13', 'cc-9'];
 // ---- background.js ----
 // scans: executeScript 호출마다 차례로 돌려줄 스캔 결과
 // server: 가짜 서버 (기본은 실제 server/pick.js 규칙 로직)
-function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, overlay = (plan) => ({ status: 'done', changed: plan.targets.map((t) => t.short), failed: [], saved: true }) } = {}) {
-  const updated = [], removed = [], created = [], sentToServer = [], plans = [], focused = [];
+function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, tabUrl = 'https://www.coupang.com/my/notification', overlay = (plan) => ({ status: 'done', changed: plan.targets.map((t) => t.short), failed: [], saved: true }) } = {}) {
+  const updated = [], removed = [], created = [], sentToServer = [], plans = [], focused = [], notices = [], badges = [], webMsgs = [], session = {};
   let onMessage = null, scanCount = 0;
   const fireComplete = (id) => [...updated].forEach((fn) => fn(id, { status: 'complete' }));
   const chrome = {
-    runtime: { onMessage: { addListener: (fn) => { onMessage = fn; } }, getPlatformInfo: (cb) => cb({}) },
+    runtime: { id: 'EXT', onMessage: { addListener: (fn) => { onMessage = fn; } }, getPlatformInfo: (cb) => cb({}) },
+    action: { setBadgeText: async (o) => { badges.push(o); }, setBadgeBackgroundColor: async () => {}, setTitle: async () => {} },
+    storage: { session: { set: async (o) => Object.assign(session, o), get: async (k) => ({ [k]: session[k] }), remove: async (k) => { delete session[k]; } } },
     tabs: {
       onUpdated: { addListener: (fn) => updated.push(fn), removeListener: (fn) => updated.splice(updated.indexOf(fn), 1) },
       onRemoved: { addListener: (fn) => removed.push(fn), removeListener: (fn) => removed.splice(removed.indexOf(fn), 1) },
@@ -44,11 +46,14 @@ function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, ov
         if (!alreadyComplete) setTimeout(() => fireComplete(id), 30);
         return { id, status: alreadyComplete ? 'complete' : 'loading' };
       },
-      get: async (id) => ({ id, status: alreadyComplete ? 'complete' : 'loading' }),
+      get: async (id) => ({ id, url: tabUrl, status: alreadyComplete ? 'complete' : 'loading' }),
+      query: async (q) => (q.url === 'http://localhost:3000/*' ? [{ id: 99 }] : []),
+      sendMessage: async (id, m) => { webMsgs.push({ id, m: plain(m) }); },
       update: async (id, p) => { focused.push({ id, ...p }); return {}; },
     },
     scripting: {
       executeScript: async ({ files, func, args }) => {
+        if (func && typeof args[0] === 'string') { notices.push(args[0]); return [{ result: null }]; } // 안내 배너
         if (func) { plans.push(plain(args[0])); return [{ result: await overlay(plain(args[0])) }]; } // 승인 배너
         if (plain(files)[0] === 'overlay.js') return [{ result: 'ready' }];
         assert.deepStrictEqual(plain(files), ['scan.js']);
@@ -64,13 +69,17 @@ function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, ov
     return { ok: true, json: async () => r, headers: { get: () => (server ? 'fake' : r.mode) } };
   };
   const quiet = { log: () => {}, warn: console.warn, error: console.error };
-  vm.runInNewContext(read('background.js'), { chrome, fetch, URL, setTimeout, clearTimeout, setInterval, clearInterval, console: quiet });
-  const send = (msg, sender = { origin: 'http://localhost:3000', url: 'http://localhost:3000/', tab: { id: 99 } }) =>
+  const ctx = vm.createContext({ chrome, fetch, URL, setTimeout, clearTimeout, setInterval, clearInterval, console: quiet });
+  ctx.importScripts = (...files) => files.forEach((x) => vm.runInContext(read(x), ctx));
+  vm.runInContext(read('background.js'), ctx);
+  const baseRemoved = removed.length; // 탭 닫힘 정리용 상시 리스너
+  const send = (msg, sender = { id: 'EXT', origin: 'http://localhost:3000', url: 'http://localhost:3000/', tab: { id: 99 } }) =>
     new Promise((resolve) => {
       const async = onMessage(msg, sender, (r) => resolve(plain(r)));
       if (!async) setTimeout(() => resolve('(응답 없음)'), 50);
     });
-  return { send, created, sentToServer, plans, focused, fireComplete, scanCount: () => scanCount, listeners: () => updated.length + removed.length };
+  const fromPopup = { id: 'EXT', url: 'chrome-extension://EXT/popup.html' };
+  return { send, fromPopup, created, sentToServer, plans, focused, notices, badges, webMsgs, session, fireComplete, scanCount: () => scanCount, listeners: () => updated.length + removed.length - baseRemoved };
 }
 
 // ---- bridge.js ----
@@ -81,10 +90,11 @@ function loadBridge(reply) {
     addEventListener: (t, fn) => { handler = fn; },
     postMessage: (msg, origin) => posted.push({ msg: plain(msg), origin }),
   };
-  const chrome = { runtime: { lastError: null, sendMessage: (m, cb) => setTimeout(() => cb(reply(m)), 5) } };
+  let onMsg = null;
+  const chrome = { runtime: { id: 'EXT', lastError: null, onMessage: { addListener: (fn) => { onMsg = fn; } }, sendMessage: (m, cb) => setTimeout(() => cb(reply(m)), 5) } };
   vm.runInNewContext(read('bridge.js'), { window, chrome, location: { origin: 'http://localhost:3000' }, setTimeout });
   const fire = (data, extra = {}) => handler({ source: window, origin: 'http://localhost:3000', data, ...extra });
-  return { posted, fire };
+  return { posted, fire, fromBg: (m, sender = { id: 'EXT' }) => onMsg(m, sender) };
 }
 
 (async () => {
@@ -154,9 +164,51 @@ function loadBridge(reply) {
   const bg5 = loadBackground();
   const r5 = await bg5.send({ type: 'REVOKE', payload: { settings_url: 'javascript:alert(1)' } });
   assert.strictEqual(r5.status, 'error');
-  assert.strictEqual(await bg5.send({ type: 'REVOKE', payload: { settings_url: url } }, { origin: 'https://evil.example' }), '(응답 없음)');
+  assert.strictEqual(await bg5.send({ type: 'REVOKE', payload: { settings_url: url } }, { id: 'EXT', origin: 'https://evil.example' }), '(응답 없음)');
   assert.strictEqual(bg5.created.length, 0);
   console.log('[5] javascript: 주소 →', r5.error, '/ [6] 다른 출처 메시지 → 무시');
+
+  // 8) 팝업 → 현재 탭(실제 사이트): 배너 직전에 팝업에 응답, 승인 결과는 체크리스트 탭에 도메인과 함께
+  const bgP = loadBackground();
+  const rp = await bgP.send({ type: 'SCAN_ACTIVE', tabId: 7 }, bgP.fromPopup);
+  assert.deepStrictEqual(rp, { status: 'banner', count: 5 });
+  await sleep(30);
+  assert.strictEqual(bgP.created.length, 0, '새 탭 안 열고 현재 탭에서');
+  assert.strictEqual(bgP.webMsgs[0].m.type, 'REVOKED');
+  assert.strictEqual(bgP.webMsgs[0].m.host, 'www.coupang.com');
+  assert.strictEqual(bgP.webMsgs[0].m.result.changed.length, 5);
+  console.log('[8] 팝업 → 현재 탭 스캔 → 배너 → 승인 → 체크리스트에 REVOKED(www.coupang.com, 5개)');
+
+  // 9) 팝업: 대상 없음 → 안내 배너 + 팝업 메시지 / 로그인 화면 / 웹 아닌 페이지 / 웹페이지에서 SCAN_ACTIVE 요청은 거절
+  const none = loadBackground({ server: () => ({ targets: [], save_id: null }) });
+  const rn = await none.send({ type: 'SCAN_ACTIVE', tabId: 7 }, none.fromPopup);
+  assert.strictEqual(rn.status, 'none');
+  assert.match(rn.message, /광고 수신 항목을 찾지 못했어요/);
+  assert.match(none.notices[0], /마케팅 설정 페이지인지/);
+  const lg = loadBackground({ scans: [{ status: 'need_login' }] });
+  assert.strictEqual((await lg.send({ type: 'SCAN_ACTIVE', tabId: 7 }, lg.fromPopup)).status, 'need_login');
+  const cr = loadBackground({ tabUrl: 'chrome://extensions' });
+  assert.strictEqual((await cr.send({ type: 'SCAN_ACTIVE', tabId: 7 }, cr.fromPopup)).status, 'error');
+  const scansBefore = bgP.scanCount();
+  assert.match((await bgP.send({ type: 'SCAN_ACTIVE', tabId: 7 })).error, /알 수 없는 요청/, '웹페이지는 SCAN_ACTIVE 못 보냄');
+  assert.strictEqual(bgP.scanCount(), scansBefore, '스캔도 안 함');
+  console.log('[9] 대상 없음 → 페이지 안내 배너 + 팝업 메시지 / 로그인 화면·chrome:// 페이지 처리 / 웹에서 SCAN_ACTIVE 거절');
+
+  // 10) GUIDE: settings_url 없는 서비스 → 홈페이지 새 탭 + 아이콘 "?" + 팝업 안내 정보
+  const gd = loadBackground();
+  const rg = await gd.send({ type: 'GUIDE', payload: { service: '쿠팡', domain: 'coupang.com' } });
+  assert.strictEqual(rg.status, 'guided');
+  assert.deepStrictEqual(gd.created, ['https://coupang.com/']);
+  assert.strictEqual(gd.badges[0].text, '?');
+  assert.deepStrictEqual(plain(gd.session['guide:1']), { service: '쿠팡', domain: 'coupang.com' });
+  assert.strictEqual((await gd.send({ type: 'GUIDE', payload: { domain: 'javascript:alert(1)' } })).status, 'error');
+  console.log('[10] GUIDE → https://coupang.com/ 새 탭, 아이콘 "?", 팝업 안내 저장 / 이상한 도메인 거절');
+
+  // 11) REVOKE 흐름에서도 대상이 없으면 페이지 안내 배너
+  const rv = loadBackground({ server: () => ({ targets: [], save_id: null }) });
+  await rv.send({ type: 'REVOKE', payload: { settings_url: url } });
+  assert.strictEqual(rv.notices.length, 1);
+  console.log('[11] REVOKE 대상 없음 → 페이지 안내 배너');
 
   // 7) bridge: 로드 시 READY, PING에 READY, 요청 중계, 다른 출처 무시
   const br = loadBridge((m) => ({ status: 'picked', echo: m.type }));
@@ -168,7 +220,11 @@ function loadBridge(reply) {
   await sleep(20);
   assert.strictEqual(br.posted.length, 3);
   assert.deepStrictEqual(br.posted[2].msg, { source: 'cc-ext', requestId: 'r1', result: { status: 'picked', echo: 'REVOKE' } });
-  console.log('[7] bridge: READY·PING·중계 정상, 다른 출처/형식 무시');
+  br.fromBg({ type: 'REVOKED', host: 'www.coupang.com', result: { changed: ['a'] } });
+  br.fromBg({ type: 'REVOKED', host: 'x' }, { id: 'OTHER' });
+  assert.deepStrictEqual(br.posted[3].msg, { source: 'cc-ext', type: 'REVOKED', host: 'www.coupang.com', result: { changed: ['a'] } });
+  assert.strictEqual(br.posted.length, 4, '다른 확장 메시지는 무시');
+  console.log('[7] bridge: READY·PING·중계 정상, REVOKED 전달, 다른 출처/형식 무시');
 
   console.log('\n✅ 확장 로직 검증 통과');
 })().catch((e) => { console.error('❌', e); process.exit(1); });

@@ -143,7 +143,7 @@
   function rowHtml(x, open) {
     const isDone = !!done[x.domain];
     const buttons = isInst(x) ? '' : [
-      x.settings_url ? `<button class="btn sm ai" data-act="ai">AI로 해제</button>` : '',
+      `<button class="btn sm ai" data-act="ai" title="${x.settings_url ? '설정 페이지를 열고 AI가 광고 동의를 찾아요' : '홈페이지를 열고 안내해요. 알림 설정 페이지에서 확장 아이콘을 눌러주세요'}">AI로 해제</button>`,
       CCUnsub.label(x) ? `<button class="btn sm${CCUnsub.kindOf(x) === 'oneclick' ? ' unsub1' : ''}" data-act="unsub">${CCUnsub.label(x)}</button>` : '',
       `<button class="btn sm" data-act="delete">삭제 요청 메일</button>`,
     ].join('');
@@ -217,7 +217,7 @@
   });
 
   // 확장 연동(revoke.js)에서 쓰는 함수들
-  window.CCApp = { setDone, setStatus, esc, applyResult, clearResult, setBusy };
+  window.CCApp = { setDone, setStatus, esc, applyResult, clearResult, setBusy, getItems: () => items };
   const revokeWithExtension = (item, btn) => window.CCRevoke.run(item, btn);
 
   // ---- 시작: 지난 결과 복원 ----

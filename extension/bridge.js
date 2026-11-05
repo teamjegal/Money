@@ -23,5 +23,11 @@
     }
   });
 
+  // 팝업으로 다른 사이트에서 해제한 결과 → 체크리스트에 반영 (background → 이 탭)
+  chrome.runtime.onMessage.addListener((msg, sender) => {
+    if (sender.id !== chrome.runtime.id || !msg || msg.type !== 'REVOKED') return;
+    post({ type: 'REVOKED', host: msg.host, result: msg.result });
+  });
+
   post({ type: 'READY' });
 })();

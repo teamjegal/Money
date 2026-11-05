@@ -20,10 +20,19 @@
     return clean(parts.join(' '));
   }
 
+  const MAX_CONTROLS = 200; // 실제 사이트는 링크가 수백 개라 상한
+  const overlayHost = document.getElementById('consent-cleaner-overlay');
+
+  // 화면에 실제로 보이는 요소만 (크기 0, 숨김, aria-hidden, 우리 배너 안은 제외)
   function isVisible(el) {
     if (!el.getClientRects().length) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
     const st = getComputedStyle(el);
-    return st.visibility !== 'hidden' && st.display !== 'none';
+    if (st.visibility === 'hidden' || st.display === 'none') return false;
+    if (el.closest('[aria-hidden="true"], [hidden], [inert]')) return false;
+    if (overlayHost && overlayHost.contains(el)) return false;
+    return true;
   }
 
   // 라벨 찾기: label[for] → 감싸는 label → aria-label → aria-labelledby → 옆 텍스트
@@ -69,7 +78,8 @@
 
   // 기존 번호를 이어서 쓴다 (다시 스캔해도 id 유지)
   let next = Math.max(0, ...[...document.querySelectorAll('[data-cc-id]')].map((e) => +e.dataset.ccId.slice(3) || 0)) + 1;
-  const controls = [];
+  const found = []; // { el, item }
+  // iframe 안은 querySelectorAll에 안 잡힌다 (맨 위 문서만)
   for (const el of document.querySelectorAll(CONTROL_SELECTOR)) {
     const kind = kindOf(el);
     let label, via;
@@ -81,16 +91,25 @@
     } else {
       ({ label, via } = labelOf(el));
     }
-    const labelEl = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-    // 숨겨진 컨트롤은 라벨이 보이면 포함 (실제 사이트에서 input을 숨기고 label을 꾸미는 경우)
+    // 숨겨진 input은 연결된 label이 보이면 포함 (실제 사이트에서 input을 숨기고 label을 토글처럼 꾸미는 경우)
+    const labelEl = (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.closest('label');
     if (!isVisible(el) && !(labelEl && isVisible(labelEl))) continue;
-    if (!el.dataset.ccId) el.dataset.ccId = `cc-${next++}`;
-    const item = { id: el.dataset.ccId, kind, label, disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true' };
+    const item = { kind, label, disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true' };
     const checked = checkedOf(el);
     if (checked !== undefined) item.checked = checked;
     if (kind === 'link') item.href = el.getAttribute('href'); // 안전 필터용 (/withdraw 같은 주소)
     item.via = via;
-    controls.push(item);
+    found.push({ el, item });
   }
-  return { status: 'ok', url: location.href, title: document.title, controls };
+
+  // 최대 200개: 토글(체크박스·스위치·라디오) → 버튼 → 링크 순으로 남긴다
+  const rank = { checkbox: 0, switch: 0, radio: 0, button: 1, link: 2 };
+  const kept = new Set([...found].sort((a, b) => rank[a.item.kind] - rank[b.item.kind]).slice(0, MAX_CONTROLS));
+  const controls = [];
+  for (const f of found) {
+    if (!kept.has(f)) continue;
+    if (!f.el.dataset.ccId) f.el.dataset.ccId = `cc-${next++}`;
+    controls.push({ id: f.el.dataset.ccId, ...f.item });
+  }
+  return { status: 'ok', url: location.href, title: document.title, controls, total: found.length, truncated: found.length > MAX_CONTROLS };
 })();

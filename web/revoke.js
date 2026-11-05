@@ -41,6 +41,7 @@ window.CCRevoke = (() => {
       $('ext-help').scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    if (!item.settings_url) return guide(item);
     const label = btn.textContent;
     btn.disabled = true;
     btn.textContent = '설정 페이지에서 진행 중…';
@@ -78,6 +79,35 @@ window.CCRevoke = (() => {
       toast(`AI 해제 실패: ${esc(result.error || '알 수 없는 오류')}`, 'warn');
     }
   }
+
+  // 설정 페이지 주소를 모르는 실제 서비스: 홈페이지를 열고 안내 (해제는 사용자가 그 사이트에서 팝업으로)
+  const GUIDE_TEXT = '로그인 후 마이페이지 > 알림 설정으로 이동한 다음, 확장 아이콘의 \'이 페이지에서 광고 동의 찾기\'를 눌러주세요';
+  async function guide(item) {
+    const { setStatus } = window.CCApp;
+    setStatus(`${item.service}: ${GUIDE_TEXT}`);
+    toast(`<b>${esc(item.service)}</b> 홈페이지를 새 탭으로 열어요.<br>${esc(GUIDE_TEXT)}<br><small>처리 결과는 이 체크리스트에 자동으로 ✅ 표시돼요.</small>`, 'info', 12000);
+    const r = await CCExt.request('GUIDE', { service: item.service, domain: item.domain }, 20000);
+    if (r.status !== 'guided') setStatus(`홈페이지를 열지 못했어요: ${r.error || '알 수 없는 오류'}`, 'error');
+  }
+
+  // 팝업으로 다른 사이트에서 해제한 결과 → 도메인이 맞는 서비스에 ✅
+  // (www.coupang.com → coupang.com, 합쳐진 서비스는 domains 중 하나라도 맞으면)
+  const hostMatches = (host, d) => host === d || host.endsWith(`.${d}`);
+  CCExt.onRevoked(({ host, result }) => {
+    const { setDone, setStatus, getItems } = window.CCApp;
+    host = String(host || '').toLowerCase();
+    const item = getItems().find((x) => x.kind !== 'institution' && (x.domains || [x.domain]).some((d) => hostMatches(host, d)));
+    const changed = result.changed || [], failed = result.failed || [];
+    const name = item ? item.service : host;
+    if (!failed.length && changed.length) {
+      if (item) setDone(item.domain, true);
+      setStatus(`✅ ${name}: ${summary(changed)} 해제`);
+      toast(`✅ <b>${esc(name)}</b> · ${esc(summary(changed))} 해제${item ? '' : '<br><small>체크리스트에 이 사이트와 맞는 서비스가 없어 표시만 했어요.</small>'}`, 'ok', 7000);
+    } else if (failed.length) {
+      setStatus(`⚠ ${name}: ${changed.length}개 해제, ${failed.length}개는 직접 꺼주세요`, 'error');
+      toast(`⚠ <b>${esc(name)}</b> · ${failed.length}개는 직접 꺼주세요 (${esc(failed.join(', '))})`, 'warn', 9000);
+    }
+  });
 
   return { run, toast };
 })();
