@@ -198,46 +198,9 @@
     }, 300);
   }
 
-  // ---- 확장 프로그램 연결 ----
-  function renderExtStatus(state) {
-    const pill = $('ext-status');
-    pill.className = 'ext-pill ' + state;
-    pill.textContent = { on: '확장 프로그램 연결됨', off: '확장 프로그램 미설치', checking: '확장 프로그램 확인 중…' }[state];
-    $('ext-help').hidden = state !== 'off';
-  }
-  CCExt.onChange((on) => renderExtStatus(on ? 'on' : 'off'));
-  // READY가 1.5초 안에 안 오면 설치 안내
-  setTimeout(() => { if (!CCExt.connected) renderExtStatus('off'); }, 1500);
-
-  async function revokeWithExtension(item, btn) {
-    if (!CCExt.connected) {
-      $('ext-help').hidden = false;
-      $('ext-help').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    const label = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '설정 페이지에서 진행 중…';
-    setStatus(`${item.service} 설정 페이지를 새 탭에서 읽는 중이에요. 로그인 화면이 뜨면 직접 로그인해 주세요.`, 'loading');
-    // 사용자가 로그인할 시간까지 넉넉히 기다린다
-    const result = await CCExt.request('REVOKE', {
-      service: item.service, domain: item.domain, settings_url: item.settings_url,
-    }, 180000);
-    btn.disabled = false;
-    btn.textContent = label;
-    console.log('[동의 클리너] REVOKE 결과', result);
-    if (result.status === 'picked') {
-      const names = result.targets.map((t) => t.label).join(', ');
-      setStatus(`해제 대상 ${result.targets.length}개를 찾았어요 (아직 클릭 안 함): ${names}`);
-      // 목록을 보고 있으면 위쪽 상태 문구가 안 보이므로 버튼에도 잠깐 표시
-      btn.textContent = `대상 ${result.targets.length}개 찾음`;
-      setTimeout(() => { btn.textContent = label; }, 4000);
-    } else if (result.status === 'need_login') {
-      setStatus(result.error, 'error');
-    } else {
-      setStatus(`AI 해제 실패: ${result.error || '알 수 없는 오류'}`, 'error');
-    }
-  }
+  // 확장 연동(revoke.js)에서 쓰는 함수들
+  window.CCApp = { setDone, setStatus, esc };
+  const revokeWithExtension = (item, btn) => window.CCRevoke.run(item, btn);
 
   // ---- 시작: 지난 결과 복원 ----
   const saved = store.get(KEY_RESULT, null);

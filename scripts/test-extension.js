@@ -29,12 +29,12 @@ const AD5 = ['cc-10', 'cc-11', 'cc-12', 'cc-13', 'cc-9'];
 // ---- background.js ----
 // scans: executeScript 호출마다 차례로 돌려줄 스캔 결과
 // server: 가짜 서버 (기본은 실제 server/pick.js 규칙 로직)
-function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server } = {}) {
-  const updated = [], removed = [], created = [], sentToServer = [];
+function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, overlay = (plan) => ({ status: 'done', changed: plan.targets.map((t) => t.short), failed: [], saved: true }) } = {}) {
+  const updated = [], removed = [], created = [], sentToServer = [], plans = [], focused = [];
   let onMessage = null, scanCount = 0;
   const fireComplete = (id) => [...updated].forEach((fn) => fn(id, { status: 'complete' }));
   const chrome = {
-    runtime: { onMessage: { addListener: (fn) => { onMessage = fn; } } },
+    runtime: { onMessage: { addListener: (fn) => { onMessage = fn; } }, getPlatformInfo: (cb) => cb({}) },
     tabs: {
       onUpdated: { addListener: (fn) => updated.push(fn), removeListener: (fn) => updated.splice(updated.indexOf(fn), 1) },
       onRemoved: { addListener: (fn) => removed.push(fn), removeListener: (fn) => removed.splice(removed.indexOf(fn), 1) },
@@ -45,13 +45,17 @@ function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server } =
         return { id, status: alreadyComplete ? 'complete' : 'loading' };
       },
       get: async (id) => ({ id, status: alreadyComplete ? 'complete' : 'loading' }),
+      update: async (id, p) => { focused.push({ id, ...p }); return {}; },
     },
     scripting: {
-      executeScript: async ({ files }) => {
+      executeScript: async ({ files, func, args }) => {
+        if (func) { plans.push(plain(args[0])); return [{ result: await overlay(plain(args[0])) }]; } // 승인 배너
+        if (plain(files)[0] === 'overlay.js') return [{ result: 'ready' }];
         assert.deepStrictEqual(plain(files), ['scan.js']);
         return [{ result: scans[Math.min(scanCount++, scans.length - 1)] }];
       },
     },
+    _update: null,
   };
   const fetch = async (url, init) => {
     const body = JSON.parse(init.body);
@@ -60,13 +64,13 @@ function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server } =
     return { ok: true, json: async () => r, headers: { get: () => (server ? 'fake' : r.mode) } };
   };
   const quiet = { log: () => {}, warn: console.warn, error: console.error };
-  vm.runInNewContext(read('background.js'), { chrome, fetch, URL, setTimeout, clearTimeout, console: quiet });
-  const send = (msg, sender = { origin: 'http://localhost:3000', url: 'http://localhost:3000/' }) =>
+  vm.runInNewContext(read('background.js'), { chrome, fetch, URL, setTimeout, clearTimeout, setInterval, clearInterval, console: quiet });
+  const send = (msg, sender = { origin: 'http://localhost:3000', url: 'http://localhost:3000/', tab: { id: 99 } }) =>
     new Promise((resolve) => {
       const async = onMessage(msg, sender, (r) => resolve(plain(r)));
       if (!async) setTimeout(() => resolve('(응답 없음)'), 50);
     });
-  return { send, created, sentToServer, fireComplete, scanCount: () => scanCount, listeners: () => updated.length + removed.length };
+  return { send, created, sentToServer, plans, focused, fireComplete, scanCount: () => scanCount, listeners: () => updated.length + removed.length };
 }
 
 // ---- bridge.js ----
@@ -89,42 +93,62 @@ function loadBridge(reply) {
   assert.ok(manifest.permissions.includes('scripting'));
   console.log('manifest: MV3, scripting 권한, bridge.js → http://localhost:3000/* (demo-shop 제외)');
 
-  // 1) REVOKE → 탭 열기 → 스캔 → 안전 필터 → 서버 → 광고 5개 + 저장 (클릭 없음)
+  // 1) REVOKE → 스캔 → 안전 필터 → 서버 → 승인 배너(계획 전달) → 승인 → done → 체크리스트 탭으로
   const bg = loadBackground();
   const r1 = await bg.send({ type: 'REVOKE', payload: { settings_url: url } });
-  assert.strictEqual(r1.status, 'picked');
-  assert.deepStrictEqual(r1.targets.map((t) => t.id).sort(), AD5);
-  assert.strictEqual(r1.save_id, 'cc-14');
-  assert.deepStrictEqual(r1.removed, ['로그아웃', '회원 탈퇴']);
+  const plan = bg.plans[0];
+  assert.deepStrictEqual(plan.targets.map((t) => t.id).sort(), AD5, '배너에 광고 5개');
+  assert.strictEqual(plan.save_id, 'cc-14');
+  assert.deepStrictEqual(plan.removed, ['로그아웃', '회원 탈퇴']);
+  assert.deepStrictEqual(plan.targets.map((t) => t.short), ['이메일 광고 수신', 'SMS 광고 수신', '앱 푸시 혜택·이벤트 알림', '야간 광고 수신', '맞춤형 광고를 위한 개인정보 이용 동의']);
   const sentLabels = bg.sentToServer[0].body.controls.map((c) => c.label);
   assert.ok(!sentLabels.some((l) => /탈퇴|로그아웃/.test(l)), '서버로 위험 요소를 보내지 않음');
   assert.ok(!bg.sentToServer[0].body.controls.some((c) => 'via' in c || 'href' in c));
-  assert.strictEqual(bg.sentToServer[0].url, 'http://localhost:3000/api/pick-targets');
+  assert.strictEqual(r1.status, 'done');
+  assert.strictEqual(r1.changed.length, 5);
+  await sleep(1900);
+  assert.deepStrictEqual(bg.focused, [{ id: 99, active: true }], '성공하면 체크리스트 탭으로 돌아감');
   assert.strictEqual(bg.listeners(), 0, '리스너 정리');
-  console.log(`[1] REVOKE → ${r1.status} (${r1.mode}): ${r1.targets.map((t) => t.label.split(' ').slice(0, 3).join(' ')).join(' / ')} + 저장 "${r1.save_label}"`);
-  console.log(`    안전 필터로 서버 전송 전 제외: ${r1.removed.join(', ')}`);
+  console.log(`[1] REVOKE → 배너 ${plan.targets.length}개 + 저장 "${plan.save_label}" → 승인 → ${r1.status}: ${r1.changed.join(' / ')}`);
+  console.log(`    안전 필터로 서버 전송 전 제외: ${plan.removed.join(', ')} · 체크리스트 탭으로 복귀`);
 
-  // 2) 이미 로딩 끝난 탭
-  assert.strictEqual((await loadBackground({ alreadyComplete: true }).send({ type: 'REVOKE', payload: { settings_url: url } })).status, 'picked');
-  console.log('[2] 이미 로딩 완료된 탭 → picked');
+  // 2) 취소 / 일부 실패 (실패면 설정 탭에 남음)
+  const rc = await loadBackground({ overlay: () => ({ status: 'cancelled', reason: 'user' }) }).send({ type: 'REVOKE', payload: { settings_url: url } });
+  assert.strictEqual(rc.status, 'cancelled');
+  const bgF = loadBackground({ overlay: () => ({ status: 'done', changed: ['이메일 광고 수신'], failed: ['SMS 광고 수신'], saved: true }) });
+  const rf = await bgF.send({ type: 'REVOKE', payload: { settings_url: url } });
+  await sleep(1900);
+  assert.deepStrictEqual(rf.failed, ['SMS 광고 수신']);
+  assert.strictEqual(bgF.focused.length, 0, '실패 항목이 있으면 설정 탭에 머묾');
+  console.log('[2] 취소 →', rc.status, '/ 일부 실패 →', rf.failed, '(설정 탭 유지)');
 
   // 3) 로그인 페이지 → 사용자가 로그인(페이지 이동)하면 다시 스캔
   const bg3 = loadBackground({ scans: [{ status: 'need_login', url: 'http://localhost:3000/demo-shop/index.html' }, SCAN_OK] });
   const p3 = bg3.send({ type: 'REVOKE', payload: { settings_url: url } });
   await sleep(120);
   assert.strictEqual(bg3.scanCount(), 1, '로그인 전에는 한 번만 스캔하고 대기');
+  assert.strictEqual(bg3.plans.length, 0, '로그인 전에는 배너 없음');
   bg3.fireComplete(1); // 사용자가 로그인 → settings.html 로 이동 완료
   const r3 = await p3;
-  assert.strictEqual(r3.status, 'picked');
+  assert.strictEqual(r3.status, 'done');
   assert.strictEqual(bg3.scanCount(), 2);
-  console.log('[3] 로그인 페이지 감지 → 대기 → 로그인 후 재스캔 →', r3.status, `${r3.targets.length}개`);
+  console.log('[3] 로그인 페이지 감지 → 대기 → 로그인 후 재스캔 → 배너 → ', r3.status);
 
-  // 4) 서버가 위험·없는 id를 돌려줘도 확장이 다시 거른다
+  // 4) 서버가 위험·없는 id를 돌려줘도 확장이 다시 거른다 (배너에 안 나감)
   const bg4 = loadBackground({ server: () => ({ targets: [{ id: 'cc-9' }, { id: 'cc-16' }, { id: 'cc-8' }, { id: 'cc-77' }], save_id: 'cc-16' }) });
-  const r4 = await bg4.send({ type: 'REVOKE', payload: { settings_url: url } });
-  assert.deepStrictEqual(r4.targets.map((t) => t.id), ['cc-9']);
-  assert.strictEqual(r4.save_id, null);
-  console.log('[4] 서버가 탈퇴·필수·없는 id 반환 → 확장이 제거:', r4.targets.map((t) => t.id), 'save_id', r4.save_id);
+  await bg4.send({ type: 'REVOKE', payload: { settings_url: url } });
+  assert.deepStrictEqual(bg4.plans[0].targets.map((t) => t.id), ['cc-9']);
+  assert.strictEqual(bg4.plans[0].save_id, null);
+  console.log('[4] 서버가 탈퇴·필수·없는 id 반환 → 배너에는', bg4.plans[0].targets.map((t) => t.id), 'save_id', bg4.plans[0].save_id);
+
+  // 4-2) 저장하면서 페이지가 새로 로드돼 오버레이가 끊김 → 다시 읽어서 라벨로 검증
+  const offScan = { ...SCAN_OK, controls: SCAN_OK.controls.map((c) => (AD5.includes(c.id) ? { ...c, checked: false } : c)) };
+  const bgR = loadBackground({ scans: [SCAN_OK, offScan], overlay: () => { throw new Error('Frame was removed'); } });
+  const pR = bgR.send({ type: 'REVOKE', payload: { settings_url: url } });
+  await sleep(80); bgR.fireComplete(1);
+  const rR = await pR;
+  assert.strictEqual(rR.status, 'done'); assert.strictEqual(rR.changed.length, 5); assert.ok(rR.reloaded);
+  console.log('[4-2] 저장 후 페이지 새로고침 → 재스캔 검증 →', rR.status, `${rR.changed.length}개`);
 
   // 5) 위험한 주소 거부 / 6) 다른 출처 무시
   const bg5 = loadBackground();

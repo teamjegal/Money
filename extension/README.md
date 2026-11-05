@@ -32,7 +32,8 @@
 | 확장 → 웹 | `{ source: "cc-ext", requestId, result }` |
 
 `result` 종류:
-- `{ status: "picked", tabId, url, mode, targets: [{id, reason, label}], save_id, save_label, removed, scanned }` — 해제 대상 선택 완료 (아직 클릭 안 함)
+- `{ status: "done", changed: [라벨], failed: [라벨], saved, tabId, mode, targets }` — 승인 후 해제 완료 (failed가 있으면 설정 탭에 빨간 표시가 남음)
+- `{ status: "cancelled", reason: "user" | "timeout" }` — 배너에서 취소했거나 3분 동안 응답 없음
 - `{ status: "need_login", tabId, error }` — 2분 안에 로그인하지 않음
 - `{ status: "error", error }`
 
@@ -43,4 +44,7 @@
 3. 컨트롤마다 `data-cc-id` 부여, 라벨 추출 (label[for] → 감싸는 label → aria-label → aria-labelledby → 옆 텍스트, 버튼·링크는 자기 글자)
 4. **안전 필터**: 탈퇴/삭제/해지/결제/구매/비밀번호/로그아웃 포함 요소 제거 (서버 `server/safety.js`에도 같은 규칙)
 5. `POST http://localhost:3000/api/pick-targets` → 서버가 다시 거르고 LLM 또는 키워드 규칙으로 선택
-6. 응답 id가 4번의 안전한 목록 안에 있는지 다시 확인 → 결과를 콘솔에 찍고 웹에 응답
+6. 응답 id가 4번의 안전한 목록 안에 있는지 다시 확인
+7. `overlay.js` 주입 → 대상 노란 강조 + 말풍선(reason) + 상단 승인 배너 (Shadow DOM)
+8. **[승인]을 눌러야만** 켜져 있는 대상만 `click()` → 저장 버튼 `click()` → 2초 뒤 다시 읽어 검증
+9. 결과를 웹으로 응답. 모두 성공하면 1.8초 뒤 체크리스트 탭으로 돌아감. 저장 중 페이지가 새로 로드되면 다시 스캔해서 라벨로 검증

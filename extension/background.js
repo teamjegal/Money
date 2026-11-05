@@ -1,6 +1,6 @@
 // 확장 background (service worker)
-// REVOKE: 설정 페이지 열기 → (로그인 대기) → 페이지 스캔 → 안전 필터 → 서버에 해제 대상 요청.
-// 아직 클릭은 하지 않는다. 고른 결과만 console.log 하고 응답으로 돌려준다.
+// REVOKE: 설정 페이지 열기 → (로그인 대기) → 페이지 스캔 → 안전 필터 → 서버에 해제 대상 요청
+//         → overlay.js 강조·승인 배너 → 사용자가 [승인]하면 그때 클릭·저장·검증 → 결과를 웹으로.
 
 const WEB_ORIGIN = 'http://localhost:3000';
 const API_BASE = 'http://localhost:3000'; // API 키는 서버(.env)에만 있다
@@ -78,7 +78,7 @@ async function pickTargets(url, controls) {
   return { data: await res.json(), mode: res.headers.get('X-Pick-Mode') };
 }
 
-async function handleRevoke(payload) {
+async function handleRevoke(payload, webTabId) {
   const url = payload && payload.settings_url;
   if (!isSafeUrl(url)) return { status: 'error', error: '설정 페이지 주소가 올바르지 않아요.' };
 
@@ -100,19 +100,77 @@ async function handleRevoke(payload) {
   const targets = (data.targets || []).filter((t) => allowed.has(t.id) && !allowed.get(t.id).disabled);
   const saveId = allowed.has(data.save_id) ? data.save_id : null;
 
-  const result = {
-    status: 'picked',
-    tabId: tab.id,
+  const plan = {
     url: scan.url,
     mode,
-    targets: targets.map((t) => ({ ...t, label: allowed.get(t.id).label })),
+    targets: targets.map((t) => {
+      const c = allowed.get(t.id);
+      return { id: t.id, reason: t.reason, label: c.label, short: shortLabel(c.label), kind: c.kind };
+    }),
     save_id: saveId,
     save_label: saveId ? allowed.get(saveId).label : null,
     removed: removed.map((c) => c.label),
     scanned: scan.controls.length,
   };
-  console.log('[cc] 해제 대상 (아직 클릭 안 함)', result);
-  return result;
+  console.log('[cc] 해제 대상', plan);
+  if (!plan.targets.length) return { status: 'done', changed: [], failed: [], note: '이미 꺼져 있거나 끌 항목이 없어요.', tabId: tab.id };
+
+  // 강조 + 승인 배너. 사용자가 [승인]/[취소]할 때까지 기다린다.
+  const outcome = await runOverlay(tab.id, plan);
+  console.log('[cc] 결과', outcome);
+  if (outcome.status === 'done' && !outcome.failed.length && webTabId) {
+    // 결과 배너를 잠깐 보여준 뒤 체크리스트 탭으로 돌아간다
+    setTimeout(() => chrome.tabs.update(webTabId, { active: true }).catch(() => {}), 1800);
+  }
+  return { ...outcome, tabId: tab.id, mode, targets: plan.targets.map((t) => t.short) };
+}
+
+// 긴 라벨에서 설명을 떼고 이름만: "이메일 광고 수신 동의 할인 쿠폰…" → "이메일 광고 수신 동의"
+function shortLabel(label) {
+  const m = label.match(/^.{2,40}?(동의|알림|수신)(?=\s|$)/);
+  return (m ? m[0] : label.slice(0, 24)).trim();
+}
+
+// 서비스 워커가 사용자 승인을 기다리는 동안 잠들지 않게 (MV3는 30초 쉬면 종료)
+function keepAlive() {
+  const t = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
+  return () => clearInterval(t);
+}
+
+async function runOverlay(tabId, plan) {
+  const stop = keepAlive();
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['overlay.js'] });
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (p) => window.__ccOverlay.show(p),
+      args: [plan],
+    });
+    return res && res.result ? res.result : { status: 'error', error: '승인 배너 결과를 받지 못했어요.' };
+  } catch (e) {
+    // 저장하면서 페이지가 새로 로드되면 스크립트가 끊긴다 → 다시 읽어서 라벨로 확인
+    console.warn('[cc] 오버레이 중단, 다시 읽어서 확인:', e.message);
+    return verifyAfterReload(tabId, plan);
+  } finally {
+    stop();
+  }
+}
+
+async function verifyAfterReload(tabId, plan) {
+  try {
+    await waitForTabComplete(tabId);
+    const scan = await scanTab(tabId);
+    if (scan.status !== 'ok') throw new Error('다시 읽기 실패');
+    const changed = [], failed = [];
+    for (const t of plan.targets) {
+      const c = scan.controls.find((x) => x.label === t.label && x.kind === t.kind);
+      const off = c && (t.kind === 'radio' ? c.checked === true : c.checked === false);
+      (off ? changed : failed).push(t.short);
+    }
+    return { status: 'done', changed, failed, saved: true, reloaded: true };
+  } catch (e) {
+    return { status: 'error', error: `해제 결과를 확인하지 못했어요: ${e.message}` };
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -121,7 +179,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (from !== WEB_ORIGIN) return false;
 
   if (msg && msg.type === 'REVOKE') {
-    handleRevoke(msg.payload)
+    handleRevoke(msg.payload, sender.tab && sender.tab.id)
       .then(sendResponse)
       .catch((e) => sendResponse({ status: 'error', error: e.message }));
     return true; // 비동기 응답
