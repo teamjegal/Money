@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# 실제 개인 메일은 절대 커밋하지 않기 (샘플은 public/samples 에만)
+*.mbox
+*.eml
+!public/samples/*.mbox
+!public/samples/*.eml
