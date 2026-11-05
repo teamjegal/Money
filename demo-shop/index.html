@@ -3,10 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>데모쇼핑</title>
+  <title>로그인 - 데모쇼핑</title>
+  <link rel="stylesheet" href="shop.css">
 </head>
-<body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem 1rem;">
-  <h1>데모쇼핑</h1>
-  <p>시연용 가짜 쇼핑몰 — 준비 중입니다.</p>
+<body>
+  <div class="notice-bar">이 사이트는 시연용 가짜 쇼핑몰입니다. 실제 정보를 입력하지 마세요.</div>
+  <header class="gnb">
+    <div class="in">
+      <a class="logo" href="index.html">데모쇼핑</a>
+      <form class="search" onsubmit="return false"><input type="text" placeholder="오늘의 특가 검색" aria-label="검색"><button type="button">검색</button></form>
+      <nav class="util"><a href="index.html">로그인</a><a href="#" class="hide-m">회원가입</a><a href="#" class="hide-m">고객센터</a></nav>
+    </div>
+  </header>
+
+  <main class="login-wrap">
+    <form class="login-box" id="login-form" autocomplete="off">
+      <h2>로그인</h2>
+      <p class="err" id="err" role="alert"></p>
+      <input type="text" id="uid" placeholder="아이디" aria-label="아이디" autocomplete="off">
+      <input type="password" id="upw" placeholder="비밀번호" aria-label="비밀번호" autocomplete="off">
+      <label class="keep"><input type="checkbox"> 로그인 상태 유지</label>
+      <button type="submit" class="btn-brand">로그인</button>
+      <div class="login-links"><a href="#">아이디 찾기</a><span>|</span><a href="#">비밀번호 찾기</a><span>|</span><a href="#">회원가입</a></div>
+      <p class="demo-hint">시연용: 아이디·비밀번호는 아무거나 입력하세요.<br>비밀번호는 저장되지 않습니다.</p>
+    </form>
+  </main>
+
+  <footer class="footer">(주)데모쇼핑 · 시연용 가상 회사 · 개인정보 문의 privacy@demo-shop.example</footer>
+
+  <script src="shop.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    if (params.has('logout')) DemoShop.logout();
+    const next = 'settings.html'; // 로그인 후 바로 알림 설정으로
+    if (DemoShop.session()) location.replace(next);
+
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const uid = document.getElementById('uid').value.trim();
+      const pw = document.getElementById('upw');
+      if (!uid || !pw.value) {
+        document.getElementById('err').textContent = '아이디와 비밀번호를 입력해 주세요.';
+        return;
+      }
+      pw.value = ''; // 비밀번호는 확인만 하고 바로 지운다 (저장 안 함)
+      DemoShop.login(uid);
+      location.href = next;
+    });
+  </script>
 </body>
 </html>

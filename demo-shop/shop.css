@@ -1,0 +1,105 @@
+/* 데모쇼핑 — 시연용 가짜 쇼핑몰 */
+:root {
+  --brand: #ff5a36;
+  --brand-dark: #e8461f;
+  --text: #222;
+  --muted: #777;
+  --line: #e6e6e6;
+  --bg: #f6f6f6;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+
+/* 상단 */
+.notice-bar { background: #222; color: #ddd; font-size: 12px; text-align: center; padding: 6px 12px; }
+.gnb { background: #fff; border-bottom: 1px solid var(--line); }
+.gnb .in { max-width: 1040px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 20px; }
+.logo { font-size: 22px; font-weight: 900; color: var(--brand); letter-spacing: -1px; white-space: nowrap; }
+.search { flex: 1; display: flex; border: 2px solid var(--brand); border-radius: 22px; overflow: hidden; max-width: 420px; }
+.search input { flex: 1; border: none; padding: 8px 14px; font: inherit; outline: none; min-width: 0; }
+.search button { border: none; background: var(--brand); color: #fff; padding: 0 16px; }
+.util { margin-left: auto; display: flex; gap: 14px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.util a:hover { color: var(--text); }
+.cate { max-width: 1040px; margin: 0 auto; padding: 0 16px; display: flex; gap: 22px; font-weight: 700; font-size: 14px; overflow-x: auto; }
+.cate a { padding: 10px 0; white-space: nowrap; }
+.cate a.on { color: var(--brand); border-bottom: 2px solid var(--brand); }
+
+/* 로그인 */
+.login-wrap { max-width: 400px; margin: 48px auto; padding: 0 16px; }
+.login-box { background: #fff; border: 1px solid var(--line); padding: 32px 28px; }
+.login-box h2 { margin: 0 0 20px; font-size: 20px; text-align: center; }
+.login-box input[type=text], .login-box input[type=password] {
+  width: 100%; padding: 12px; border: 1px solid #ccc; margin-bottom: 8px; font: inherit;
+}
+.login-box input:focus { outline: none; border-color: var(--brand); }
+.login-box .keep { font-size: 13px; color: var(--muted); display: block; margin: 4px 0 16px; }
+.btn-brand { width: 100%; padding: 13px; border: none; background: var(--brand); color: #fff; font-size: 16px; font-weight: 700; }
+.btn-brand:hover { background: var(--brand-dark); }
+.login-links { display: flex; justify-content: center; gap: 14px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.demo-hint { margin-top: 16px; font-size: 12px; color: #999; text-align: center; }
+.err { color: #d33; font-size: 13px; min-height: 18px; margin: 0 0 6px; }
+
+/* 마이페이지 */
+.mypage { max-width: 1040px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
+.side { background: #fff; border: 1px solid var(--line); padding: 20px 0; align-self: start; }
+.side .hello { padding: 0 20px 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.side .hello b { font-size: 16px; }
+.side .grade { display: inline-block; font-size: 11px; background: #fff0eb; color: var(--brand); padding: 1px 6px; border-radius: 3px; margin-top: 4px; }
+.side h4 { margin: 14px 20px 4px; font-size: 12px; color: #999; font-weight: 400; }
+.side a { display: block; padding: 6px 20px; color: #444; }
+.side a.on { color: var(--brand); font-weight: 700; background: #fff7f4; }
+.content h2 { margin: 0 0 6px; font-size: 20px; }
+.content .desc { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+
+.result-msg { background: #f0f9f3; border: 1px solid #b9e2c6; color: #1e6b3a; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+.result-msg ul { margin: 6px 0 0; padding-left: 18px; }
+.result-msg.plain { background: #f7f7f7; border-color: var(--line); color: #555; }
+
+.pref-section { background: #fff; border: 1px solid var(--line); margin-bottom: 16px; }
+.pref-section > h3 { margin: 0; padding: 14px 20px; font-size: 15px; border-bottom: 1px solid var(--line); background: #fafafa; }
+.pref-row { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #f0f0f0; }
+.pref-row:last-child { border-bottom: none; }
+.pref-row .txt { flex: 1; }
+.pref-row .tit { font-weight: 700; display: block; }
+.pref-row small, .pref-row .sub { color: var(--muted); font-size: 12px; display: block; }
+.pref-row em { font-style: normal; }
+.tag-req { font-size: 11px; color: #999; border: 1px solid #ddd; padding: 0 4px; margin-left: 4px; font-weight: 400; }
+dl.pref-row { margin: 0; }
+dl.pref-row dt { flex: 1; }
+dl.pref-row dd { margin: 0; }
+
+/* 토글 스위치: 진짜 checkbox를 모양만 바꿈 */
+input.switch {
+  appearance: none; -webkit-appearance: none; margin: 0; flex-shrink: 0;
+  width: 46px; height: 26px; border-radius: 13px; background: #ccc; position: relative; cursor: pointer;
+  transition: background .2s;
+}
+input.switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .2s;
+}
+input.switch:checked { background: var(--brand); }
+input.switch:checked::after { left: 23px; }
+input.switch:disabled { opacity: .5; cursor: not-allowed; }
+input.switch:focus-visible { outline: 2px solid #333; outline-offset: 2px; }
+label.wrap-label { display: flex; align-items: center; gap: 16px; flex: 1; cursor: pointer; }
+
+.save-area { text-align: center; margin: 20px 0; }
+.btn-save { padding: 12px 48px; border: none; background: #333; color: #fff; font-size: 15px; font-weight: 700; }
+.btn-save:hover { background: #111; }
+.btn-cancel { padding: 12px 24px; border: 1px solid #ccc; background: #fff; margin-left: 6px; }
+.withdraw-area { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 16px; font-size: 12px; color: #999; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.withdraw-area a { text-decoration: underline; }
+
+.footer { text-align: center; color: #aaa; font-size: 12px; padding: 32px 16px 48px; }
+.demo-reset { position: fixed; left: 10px; bottom: 8px; font-size: 11px; color: #aaa; background: rgba(255,255,255,.8); padding: 2px 6px; border-radius: 4px; text-decoration: underline; z-index: 10; }
+
+@media (max-width: 720px) {
+  .search, .util .hide-m { display: none; }
+  .mypage { grid-template-columns: 1fr; }
+  .side { display: none; }
+  .pref-row { padding: 14px 16px; }
+}
