@@ -11,11 +11,28 @@ async function handleRevoke(payload, webTabId) {
   const tab = await chrome.tabs.create({ url, active: true });
   await waitForTabComplete(tab.id);
 
-  const scan = await scanUntilLoggedIn(tab.id);
+  let scan = await scanUntilLoggedIn(tab.id);
   if (scan.status === 'need_login') return { status: 'need_login', tabId: tab.id, error: '로그인이 필요해요. 열린 탭에서 로그인한 뒤 다시 시도해 주세요.' };
   if (scan.status !== 'ok') return { status: 'error', tabId: tab.id, error: scan.error || '페이지를 읽지 못했어요.' };
 
-  const plan = await buildPlan(scan);
+  let plan = await planIfToggles(scan);
+  // 실제 사이트 보정 1: 화면을 자바스크립트로 늦게 그리는 페이지(SPA) → 잠깐 기다렸다 다시 읽기
+  if (!plan.targets.length) {
+    await new Promise((r) => setTimeout(r, 2000));
+    scan = await scanTab(tab.id);
+    if (scan.status === 'ok') plan = await planIfToggles(scan);
+  }
+  // 실제 사이트 보정 2: 로그인 뒤 홈 등 다른 페이지로 갔다면 설정 페이지로 한 번 더 이동
+  if (!plan.targets.length && scan.status === 'ok' && !samePage(scan.url, url)) {
+    console.log('[cc] 로그인 후 다른 페이지 → 설정 페이지로 다시 이동', scan.url);
+    await chrome.tabs.update(tab.id, { url });
+    await waitForTabComplete(tab.id, { onlyNext: true });
+    scan = await scanUntilLoggedIn(tab.id);
+    if (scan.status === 'ok') {
+      plan = await planIfToggles(scan);
+      if (!plan.targets.length) { await new Promise((r) => setTimeout(r, 2000)); scan = await scanTab(tab.id); if (scan.status === 'ok') plan = await planIfToggles(scan); }
+    }
+  }
   if (!plan.targets.length) {
     await showNotice(tab.id, NOT_FOUND);
     return { status: 'done', changed: [], failed: [], note: '이미 꺼져 있거나 끌 항목이 없어요.', tabId: tab.id };
@@ -31,6 +48,22 @@ async function handleRevoke(payload, webTabId) {
   return { ...outcome, tabId: tab.id, mode: plan.mode, targets: plan.targets.map((t) => t.short) };
 }
 
+// 같은 페이지인지 (주소의 호스트+경로 기준, www 무시)
+function samePage(a, b) {
+  try {
+    const x = new URL(a), y = new URL(b);
+    const h = (u) => u.hostname.replace(/^www\./, '');
+    return h(x) === h(y) && x.pathname.replace(/\/$/, '') === y.pathname.replace(/\/$/, '');
+  } catch { return false; }
+}
+
+// 토글(체크박스·스위치·라디오)이 하나도 없으면 서버(LLM)를 부르지 않는다
+async function planIfToggles(scan) {
+  const hasToggle = scan.controls.some((c) => ['checkbox', 'switch', 'radio'].includes(c.kind));
+  if (!hasToggle) return { targets: [], scanned: scan.controls.length, mode: 'skip' };
+  return buildPlan(scan);
+}
+
 // 설정 페이지 주소를 모르는 실제 서비스: 홈페이지를 열고, 확장 아이콘에 "?" 표시 + 팝업에 안내
 async function handleGuide(payload) {
   const domain = String((payload && payload.domain) || '').toLowerCase();
@@ -43,6 +76,10 @@ async function handleGuide(payload) {
   chrome.action.setBadgeText({ tabId: tab.id, text: '?' }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#2156d9' }).catch(() => {});
   chrome.action.setTitle({ tabId: tab.id, title: `동의 클리너: ${payload.service || domain} 알림 설정 페이지에서 눌러주세요` }).catch(() => {});
+  // 홈페이지 위에도 안내 배너 (https 사이트 권한이 있어서 가능)
+  waitForTabComplete(tab.id)
+    .then(() => showNotice(tab.id, `${payload.service || domain}: 로그인 후 마이페이지 > 알림(수신) 설정으로 이동한 다음, 브라우저 오른쪽 위 확장 아이콘의 '이 페이지에서 광고 동의 찾기'를 눌러주세요.`, 30000))
+    .catch(() => {});
   return { status: 'guided', tabId: tab.id };
 }
 
@@ -59,7 +96,7 @@ async function handleScanActive(tabId, respond) {
   if (scan.status !== 'ok') return respond({ status: 'error', message: scan.error || '페이지를 읽지 못했어요.' });
 
   let plan;
-  try { plan = await buildPlan(scan); } catch (e) { return respond({ status: 'error', message: `동의 클리너 서버에 연결하지 못했어요 (${e.message}). npm start 상태를 확인해주세요.` }); }
+  try { plan = await planIfToggles(scan); } catch (e) { return respond({ status: 'error', message: `동의 클리너 서버에 연결하지 못했어요 (${e.message}). npm start 상태를 확인해주세요.` }); }
   if (!plan.targets.length) {
     await showNotice(tabId, NOT_FOUND);
     return respond({ status: 'none', message: NOT_FOUND, scanned: plan.scanned });

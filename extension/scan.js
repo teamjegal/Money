@@ -72,9 +72,11 @@
     return aria === null ? undefined : aria === 'true';
   }
 
-  // 로그인 페이지인지: 보이는 비밀번호 칸이 있으면
+  // 로그인 페이지인지: 보이는 비밀번호 칸이 있거나, 로그인 주소에서 아이디 칸만 보이는 경우(아이디 먼저 받는 로그인)
   const pw = [...document.querySelectorAll('input[type=password]')].some(isVisible);
-  if (pw) return { status: 'need_login', url: location.href };
+  const loginUrl = /\/(log-?in|sign-?in|signin|auth\/|account\/login|session|sso)|accounts\.google\.com\/(v3\/)?signin|\/\/login\./i.test(location.href);
+  const idField = [...document.querySelectorAll('input[type=email], input[autocomplete=username], input[name*=user i], input[name*=login i], input[name=email]')].some(isVisible);
+  if (pw || (loginUrl && idField)) return { status: 'need_login', url: location.href };
 
   // 기존 번호를 이어서 쓴다 (다시 스캔해도 id 유지)
   let next = Math.max(0, ...[...document.querySelectorAll('[data-cc-id]')].map((e) => +e.dataset.ccId.slice(3) || 0)) + 1;

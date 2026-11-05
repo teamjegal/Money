@@ -53,6 +53,8 @@ async function scanTab(tabId) {
 async function scanUntilLoggedIn(tabId) {
   const deadline = Date.now() + LOGIN_TIMEOUT;
   let scan = await scanTab(tabId);
+  const stop = scan.status === 'need_login' ? keepAlive() : () => {}; // 로그인 기다리는 동안 서비스 워커 유지
+  try {
   while (scan.status === 'need_login') {
     const left = deadline - Date.now();
     if (left <= 0) return scan;
@@ -65,6 +67,7 @@ async function scanUntilLoggedIn(tabId) {
     }
     scan = await scanTab(tabId);
   }
+  } finally { stop(); }
   return scan;
 }
 
@@ -153,10 +156,10 @@ async function verifyAfterReload(tabId, plan) {
 }
 
 // 페이지에 짧은 안내 배너 (대상을 못 찾았을 때 등)
-async function showNotice(tabId, text) {
+async function showNotice(tabId, text, ms) {
   try {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['overlay.js'] });
-    await chrome.scripting.executeScript({ target: { tabId }, func: (t) => window.__ccOverlay.notice(t), args: [text] });
+    await chrome.scripting.executeScript({ target: { tabId }, func: (t, m) => window.__ccOverlay.notice(t, m), args: [text, ms || 10000] });
   } catch (e) {
     console.warn('[cc] 안내 배너 표시 실패:', e.message);
   }

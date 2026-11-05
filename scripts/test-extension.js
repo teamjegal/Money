@@ -49,7 +49,7 @@ function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server, ta
       get: async (id) => ({ id, url: tabUrl, status: alreadyComplete ? 'complete' : 'loading' }),
       query: async (q) => (q.url === 'http://localhost:3000/*' ? [{ id: 99 }] : []),
       sendMessage: async (id, m) => { webMsgs.push({ id, m: plain(m) }); },
-      update: async (id, p) => { focused.push({ id, ...p }); return {}; },
+      update: async (id, p) => { focused.push({ id, ...p }); if (p.url) setTimeout(() => fireComplete(id), 30); return {}; },
     },
     scripting: {
       executeScript: async ({ files, func, args }) => {
@@ -213,6 +213,26 @@ function loadBridge(reply) {
   await rv.send({ type: 'REVOKE', payload: { settings_url: url } });
   assert.strictEqual(rv.notices.length, 1);
   console.log('[11] REVOKE 대상 없음 → 페이지 안내 배너');
+
+  // 12) 실제 사이트: 설정 페이지 → 로그인 → 홈으로 감 → 설정 페이지로 다시 이동해서 성공 (토글 없는 페이지는 서버 안 부름)
+  const HOME = { status: 'ok', url: 'https://www.facebook.com/', controls: [{ id: 'cc-1', kind: 'link', label: '홈', disabled: false }] };
+  const real = loadBackground({ scans: [{ status: 'need_login' }, HOME, HOME, { ...SCAN_OK, url: 'https://www.facebook.com/settings/?tab=notifications' }] });
+  const settings = 'https://www.facebook.com/settings/?tab=notifications';
+  const pr = real.send({ type: 'REVOKE', payload: { service: 'Facebook', domain: 'facebookmail.com', settings_url: settings } });
+  await sleep(120);
+  real.fireComplete(1); // 사용자가 로그인 → 홈으로 이동
+  const rr = await pr;
+  assert.strictEqual(rr.status, 'done');
+  assert.ok(real.focused.some((x) => x.url === settings), '설정 페이지로 다시 이동');
+  assert.strictEqual(real.sentToServer.length, 1, '홈(토글 없음)에서는 서버를 부르지 않음');
+  console.log('[12] 실제 사이트: 로그인 → 홈 → 설정 페이지로 재이동 → 배너 → done (토글 없는 페이지는 LLM 호출 안 함)');
+
+  // 13) GUIDE: 홈페이지 위에도 안내 배너
+  const gn = loadBackground();
+  await gn.send({ type: 'GUIDE', payload: { service: 'Use AI', domain: 'use.ai', url: 'https://use.ai/' } });
+  await sleep(80);
+  assert.match(gn.notices[0], /Use AI: 로그인 후 마이페이지/);
+  console.log('[13] GUIDE → 홈페이지 위 안내 배너');
 
   // 7) bridge: 로드 시 READY, PING에 READY, 요청 중계, 다른 출처 무시
   const br = loadBridge((m) => ({ status: 'picked', echo: m.type }));

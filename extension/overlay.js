@@ -186,7 +186,7 @@
   }
 
   // 짧은 안내 배너 (클릭 없음): 대상을 못 찾았을 때 등
-  function notice(text) {
+  function notice(text, ms = 10000) {
     if (host) unmount();
     mount();
     const banner = document.createElement('div');
@@ -195,7 +195,7 @@
     banner.innerHTML = `<div class="brand">동의 클리너</div><p class="title" style="font-size:15px">${esc(text)}</p>
       <div class="btns"><button class="close">닫기</button></div>`;
     root.appendChild(banner);
-    const timer = setTimeout(unmount, 10000);
+    const timer = setTimeout(unmount, ms);
     banner.querySelector('.close').addEventListener('click', () => { clearTimeout(timer); unmount(); });
   }
 
