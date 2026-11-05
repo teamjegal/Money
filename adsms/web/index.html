@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ADyson 통계</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #14161a;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #2563eb;
+      --ok: #16a34a;
+      --err: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #171a21;
+        --text: #f3f4f6;
+        --muted: #9ca3af;
+        --line: #262a33;
+        --accent: #60a5fa;
+        --ok: #4ade80;
+        --err: #f87171;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 880px; margin: 0 auto; padding: 48px 16px; }
+    header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
+    h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 14px; margin: 0; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
+    .dot.err { background: var(--err); }
+    button {
+      font: inherit; font-size: 13px; color: var(--text);
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 12px; cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 22px 22px 20px;
+    }
+    .label { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    .value { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .unit { font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .error { margin-top: 16px; color: var(--err); font-size: 14px; display: none; }
+    footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>ADyson 수신거부 통계</h1>
+        <p class="sub">앱에서 "완료"를 누를 때 모이는 익명 기록입니다. 문자 내용과 번호는 저장하지 않습니다.</p>
+      </div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span id="status">불러오는 중…</span>
+        <button id="refresh" type="button">새로고침</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">총 수신거부 건수</div>
+        <div class="value"><span id="total">–</span><span class="unit">건</span></div>
+        <div class="hint">지금까지 처리된 전체 건수</div>
+      </div>
+      <div class="card">
+        <div class="label">사용자 수</div>
+        <div class="value"><span id="users">–</span><span class="unit">명</span></div>
+        <div class="hint">고유 설치 ID 기준</div>
+      </div>
+      <div class="card">
+        <div class="label">1인당 평균 처리 건수</div>
+        <div class="value"><span id="avg">–</span><span class="unit">건</span></div>
+        <div class="hint">총 건수 ÷ 사용자 수</div>
+      </div>
+    </section>
+
+    <p class="error" id="error"></p>
+    <footer>30초마다 자동으로 새로고침됩니다.</footer>
+  </main>
+
+  <script>
+    const STATS_URL = "https://prqezaecwmfvjhfmqytf.supabase.co/functions/v1/stats";
+    const REFRESH_MS = 30_000;
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
+    const timeFmt = new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+
+    async function load() {
+      try {
+        const res = await fetch(STATS_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const s = await res.json();
+        $("total").textContent = fmt.format(s.total);
+        $("users").textContent = fmt.format(s.users);
+        $("avg").textContent = fmt.format(s.avgPerUser);
+        $("dot").className = "dot ok";
+        $("status").textContent = "마지막 갱신 " + timeFmt.format(new Date(s.updatedAt || Date.now()));
+        $("error").style.display = "none";
+      } catch (e) {
+        $("dot").className = "dot err";
+        $("status").textContent = "연결 실패";
+        $("error").textContent = "통계를 불러오지 못했습니다 (" + e.message + "). 잠시 후 다시 시도합니다.";
+        $("error").style.display = "block";
+      }
+    }
+
+    $("refresh").addEventListener("click", load);
+    load();
+    setInterval(load, REFRESH_MS);
+  </script>
+</body>
+</html>
