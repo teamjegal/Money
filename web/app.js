@@ -217,18 +217,23 @@
     }
     const label = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '설정 페이지 여는 중…';
-    setStatus(`${item.service} 설정 페이지를 새 탭으로 여는 중이에요…`, 'loading');
+    btn.textContent = '설정 페이지에서 진행 중…';
+    setStatus(`${item.service} 설정 페이지를 새 탭에서 읽는 중이에요. 로그인 화면이 뜨면 직접 로그인해 주세요.`, 'loading');
+    // 사용자가 로그인할 시간까지 넉넉히 기다린다
     const result = await CCExt.request('REVOKE', {
       service: item.service, domain: item.domain, settings_url: item.settings_url,
-    });
+    }, 180000);
     btn.disabled = false;
     btn.textContent = label;
-    if (result.status === 'opened') {
-      setStatus(`${item.service} 설정 페이지를 새 탭에서 열었어요.`);
+    console.log('[동의 클리너] REVOKE 결과', result);
+    if (result.status === 'picked') {
+      const names = result.targets.map((t) => t.label).join(', ');
+      setStatus(`해제 대상 ${result.targets.length}개를 찾았어요 (아직 클릭 안 함): ${names}`);
       // 목록을 보고 있으면 위쪽 상태 문구가 안 보이므로 버튼에도 잠깐 표시
-      btn.textContent = '새 탭에서 열림 ✓';
-      setTimeout(() => { btn.textContent = label; }, 3000);
+      btn.textContent = `대상 ${result.targets.length}개 찾음`;
+      setTimeout(() => { btn.textContent = label; }, 4000);
+    } else if (result.status === 'need_login') {
+      setStatus(result.error, 'error');
     } else {
       setStatus(`AI 해제 실패: ${result.error || '알 수 없는 오류'}`, 'error');
     }

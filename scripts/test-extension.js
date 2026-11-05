@@ -4,35 +4,69 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
+const { pickTargets } = require('../server/pick');
 
 const read = (f) => fs.readFileSync(path.join(__dirname, '..', 'extension', f), 'utf8');
 const manifest = JSON.parse(read('manifest.json'));
+const plain = (o) => JSON.parse(JSON.stringify(o)); // vm 객체 → 일반 객체
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 데모쇼핑 settings.html 을 scan.js 로 읽은 결과 (브라우저에서 확인한 실제 값)
+const SCAN_OK = { status: 'ok', url: 'http://localhost:3000/demo-shop/settings.html', controls: [
+  { id: 'cc-2', kind: 'link', label: '로그아웃', disabled: false, href: 'index.html?logout', via: 'own-text' },
+  { id: 'cc-8', kind: 'checkbox', label: '주문·배송 알림 필수', checked: true, disabled: true, via: 'label-for' },
+  { id: 'cc-9', kind: 'checkbox', label: '이메일 광고 수신 동의 할인 쿠폰, 기획전 소식을 이메일로 받습니다.', checked: true, disabled: false, via: 'label-wrap' },
+  { id: 'cc-10', kind: 'checkbox', label: 'SMS 광고 수신 동의 문자로 타임특가 알림을 받습니다.', checked: true, disabled: false, via: 'nearby-text' },
+  { id: 'cc-11', kind: 'checkbox', label: '앱 푸시 혜택·이벤트 알림', checked: true, disabled: false, via: 'aria-labelledby' },
+  { id: 'cc-12', kind: 'checkbox', label: '야간 광고 수신 동의 오후 9시 ~ 오전 8시 사이 광고성 알림 수신', checked: true, disabled: false, via: 'label-wrap' },
+  { id: 'cc-13', kind: 'checkbox', label: '맞춤형 광고를 위한 개인정보 이용 동의', checked: true, disabled: false, via: 'label-for' },
+  { id: 'cc-14', kind: 'button', label: '저장하기', disabled: false, via: 'own-text' },
+  { id: 'cc-15', kind: 'button', label: '취소', disabled: false, via: 'own-text' },
+  { id: 'cc-16', kind: 'link', label: '회원 탈퇴', disabled: false, href: '#', via: 'own-text' },
+] };
+const AD5 = ['cc-10', 'cc-11', 'cc-12', 'cc-13', 'cc-9'];
 
 // ---- background.js ----
-function loadBackground({ loadDelay = 30, alreadyComplete = false } = {}) {
-  const updated = [];
-  let onMessage = null;
-  const created = [];
+// scans: executeScript 호출마다 차례로 돌려줄 스캔 결과
+// server: 가짜 서버 (기본은 실제 server/pick.js 규칙 로직)
+function loadBackground({ alreadyComplete = false, scans = [SCAN_OK], server } = {}) {
+  const updated = [], removed = [], created = [], sentToServer = [];
+  let onMessage = null, scanCount = 0;
+  const fireComplete = (id) => [...updated].forEach((fn) => fn(id, { status: 'complete' }));
   const chrome = {
     runtime: { onMessage: { addListener: (fn) => { onMessage = fn; } } },
     tabs: {
       onUpdated: { addListener: (fn) => updated.push(fn), removeListener: (fn) => updated.splice(updated.indexOf(fn), 1) },
+      onRemoved: { addListener: (fn) => removed.push(fn), removeListener: (fn) => removed.splice(removed.indexOf(fn), 1) },
       create: async ({ url }) => {
         const id = created.length + 1;
         created.push(url);
-        if (!alreadyComplete) setTimeout(() => [...updated].forEach((fn) => fn(id, { status: 'complete' })), loadDelay);
+        if (!alreadyComplete) setTimeout(() => fireComplete(id), 30);
         return { id, status: alreadyComplete ? 'complete' : 'loading' };
       },
       get: async (id) => ({ id, status: alreadyComplete ? 'complete' : 'loading' }),
     },
+    scripting: {
+      executeScript: async ({ files }) => {
+        assert.deepStrictEqual(plain(files), ['scan.js']);
+        return [{ result: scans[Math.min(scanCount++, scans.length - 1)] }];
+      },
+    },
   };
-  vm.runInNewContext(read('background.js'), { chrome, URL, setTimeout, clearTimeout, console });
+  const fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    sentToServer.push({ url, body });
+    const r = server ? server(body) : await pickTargets(body, { client: null });
+    return { ok: true, json: async () => r, headers: { get: () => (server ? 'fake' : r.mode) } };
+  };
+  const quiet = { log: () => {}, warn: console.warn, error: console.error };
+  vm.runInNewContext(read('background.js'), { chrome, fetch, URL, setTimeout, clearTimeout, console: quiet });
   const send = (msg, sender = { origin: 'http://localhost:3000', url: 'http://localhost:3000/' }) =>
     new Promise((resolve) => {
-      const async = onMessage(msg, sender, resolve);
+      const async = onMessage(msg, sender, (r) => resolve(plain(r)));
       if (!async) setTimeout(() => resolve('(응답 없음)'), 50);
     });
-  return { send, created, listeners: () => updated.length };
+  return { send, created, sentToServer, fireComplete, scanCount: () => scanCount, listeners: () => updated.length + removed.length };
 }
 
 // ---- bridge.js ----
@@ -41,7 +75,7 @@ function loadBridge(reply) {
   let handler = null;
   const window = {
     addEventListener: (t, fn) => { handler = fn; },
-    postMessage: (msg, origin) => posted.push({ msg: JSON.parse(JSON.stringify(msg)), origin }), // vm 객체 → 일반 객체
+    postMessage: (msg, origin) => posted.push({ msg: plain(msg), origin }),
   };
   const chrome = { runtime: { lastError: null, sendMessage: (m, cb) => setTimeout(() => cb(reply(m)), 5) } };
   vm.runInNewContext(read('bridge.js'), { window, chrome, location: { origin: 'http://localhost:3000' }, setTimeout });
@@ -50,58 +84,67 @@ function loadBridge(reply) {
 }
 
 (async () => {
-  // manifest
+  const url = SCAN_OK.url;
   assert.strictEqual(manifest.manifest_version, 3);
-  assert.ok(manifest.content_scripts[0].js.includes('bridge.js'));
-  console.log('manifest: MV3, bridge.js → http://localhost:3000/* (demo-shop 제외)');
+  assert.ok(manifest.permissions.includes('scripting'));
+  console.log('manifest: MV3, scripting 권한, bridge.js → http://localhost:3000/* (demo-shop 제외)');
 
-  // 1) REVOKE → 새 탭 열고 로딩 완료 후 opened
+  // 1) REVOKE → 탭 열기 → 스캔 → 안전 필터 → 서버 → 광고 5개 + 저장 (클릭 없음)
   const bg = loadBackground();
-  const url = 'http://localhost:3000/demo-shop/settings.html';
-  const t = Date.now();
   const r1 = await bg.send({ type: 'REVOKE', payload: { settings_url: url } });
-  assert.strictEqual(r1.status, 'opened');
-  assert.deepStrictEqual(bg.created, [url]);
-  assert.ok(Date.now() - t >= 25, '로딩 완료까지 기다림');
+  assert.strictEqual(r1.status, 'picked');
+  assert.deepStrictEqual(r1.targets.map((t) => t.id).sort(), AD5);
+  assert.strictEqual(r1.save_id, 'cc-14');
+  assert.deepStrictEqual(r1.removed, ['로그아웃', '회원 탈퇴']);
+  const sentLabels = bg.sentToServer[0].body.controls.map((c) => c.label);
+  assert.ok(!sentLabels.some((l) => /탈퇴|로그아웃/.test(l)), '서버로 위험 요소를 보내지 않음');
+  assert.ok(!bg.sentToServer[0].body.controls.some((c) => 'via' in c || 'href' in c));
+  assert.strictEqual(bg.sentToServer[0].url, 'http://localhost:3000/api/pick-targets');
   assert.strictEqual(bg.listeners(), 0, '리스너 정리');
-  console.log('[1] REVOKE →', JSON.stringify(r1), `(${Date.now() - t}ms 대기)`);
+  console.log(`[1] REVOKE → ${r1.status} (${r1.mode}): ${r1.targets.map((t) => t.label.split(' ').slice(0, 3).join(' ')).join(' / ')} + 저장 "${r1.save_label}"`);
+  console.log(`    안전 필터로 서버 전송 전 제외: ${r1.removed.join(', ')}`);
 
-  // 2) 이미 로딩 끝난 탭도 바로 응답
-  const r2 = await loadBackground({ alreadyComplete: true }).send({ type: 'REVOKE', payload: { settings_url: url } });
-  assert.strictEqual(r2.status, 'opened');
-  console.log('[2] 이미 로딩 완료된 탭 →', r2.status);
+  // 2) 이미 로딩 끝난 탭
+  assert.strictEqual((await loadBackground({ alreadyComplete: true }).send({ type: 'REVOKE', payload: { settings_url: url } })).status, 'picked');
+  console.log('[2] 이미 로딩 완료된 탭 → picked');
 
-  // 3) 위험한 주소 거부
-  const bg3 = loadBackground();
-  const r3 = await bg3.send({ type: 'REVOKE', payload: { settings_url: 'javascript:alert(1)' } });
-  assert.strictEqual(r3.status, 'error');
-  assert.strictEqual(bg3.created.length, 0);
-  console.log('[3] javascript: 주소 →', r3.error);
+  // 3) 로그인 페이지 → 사용자가 로그인(페이지 이동)하면 다시 스캔
+  const bg3 = loadBackground({ scans: [{ status: 'need_login', url: 'http://localhost:3000/demo-shop/index.html' }, SCAN_OK] });
+  const p3 = bg3.send({ type: 'REVOKE', payload: { settings_url: url } });
+  await sleep(120);
+  assert.strictEqual(bg3.scanCount(), 1, '로그인 전에는 한 번만 스캔하고 대기');
+  bg3.fireComplete(1); // 사용자가 로그인 → settings.html 로 이동 완료
+  const r3 = await p3;
+  assert.strictEqual(r3.status, 'picked');
+  assert.strictEqual(bg3.scanCount(), 2);
+  console.log('[3] 로그인 페이지 감지 → 대기 → 로그인 후 재스캔 →', r3.status, `${r3.targets.length}개`);
 
-  // 4) 다른 사이트에서 온 메시지 무시
-  const r4 = await bg3.send({ type: 'REVOKE', payload: { settings_url: url } }, { origin: 'https://evil.example' });
-  assert.strictEqual(r4, '(응답 없음)');
-  assert.strictEqual(bg3.created.length, 0);
-  console.log('[4] 다른 출처 메시지 → 무시');
+  // 4) 서버가 위험·없는 id를 돌려줘도 확장이 다시 거른다
+  const bg4 = loadBackground({ server: () => ({ targets: [{ id: 'cc-9' }, { id: 'cc-16' }, { id: 'cc-8' }, { id: 'cc-77' }], save_id: 'cc-16' }) });
+  const r4 = await bg4.send({ type: 'REVOKE', payload: { settings_url: url } });
+  assert.deepStrictEqual(r4.targets.map((t) => t.id), ['cc-9']);
+  assert.strictEqual(r4.save_id, null);
+  console.log('[4] 서버가 탈퇴·필수·없는 id 반환 → 확장이 제거:', r4.targets.map((t) => t.id), 'save_id', r4.save_id);
 
-  // 5) bridge: 로드 시 READY, PING에 READY, 요청 중계
-  const br = loadBridge((m) => ({ status: 'opened', echo: m.type }));
+  // 5) 위험한 주소 거부 / 6) 다른 출처 무시
+  const bg5 = loadBackground();
+  const r5 = await bg5.send({ type: 'REVOKE', payload: { settings_url: 'javascript:alert(1)' } });
+  assert.strictEqual(r5.status, 'error');
+  assert.strictEqual(await bg5.send({ type: 'REVOKE', payload: { settings_url: url } }, { origin: 'https://evil.example' }), '(응답 없음)');
+  assert.strictEqual(bg5.created.length, 0);
+  console.log('[5] javascript: 주소 →', r5.error, '/ [6] 다른 출처 메시지 → 무시');
+
+  // 7) bridge: 로드 시 READY, PING에 READY, 요청 중계, 다른 출처 무시
+  const br = loadBridge((m) => ({ status: 'picked', echo: m.type }));
   assert.deepStrictEqual(br.posted[0].msg, { source: 'cc-ext', type: 'READY' });
   br.fire({ source: 'cc-web', type: 'PING' });
-  assert.strictEqual(br.posted[1].msg.type, 'READY');
   br.fire({ source: 'cc-web', type: 'REVOKE', requestId: 'r1', payload: {} });
-  await new Promise((r) => setTimeout(r, 20));
-  assert.deepStrictEqual(br.posted[2].msg, { source: 'cc-ext', requestId: 'r1', result: { status: 'opened', echo: 'REVOKE' } });
-  assert.strictEqual(br.posted[2].origin, 'http://localhost:3000');
-  console.log('[5] bridge: READY 전송, PING 응답, REVOKE 중계 →', JSON.stringify(br.posted[2].msg));
-
-  // 6) bridge: 다른 출처·다른 source 무시
-  const before = br.posted.length;
   br.fire({ source: 'cc-web', type: 'REVOKE', requestId: 'x' }, { origin: 'https://evil.example' });
   br.fire({ source: 'other', type: 'REVOKE', requestId: 'y' });
-  await new Promise((r) => setTimeout(r, 20));
-  assert.strictEqual(br.posted.length, before);
-  console.log('[6] bridge: 다른 출처/형식 메시지 → 무시');
+  await sleep(20);
+  assert.strictEqual(br.posted.length, 3);
+  assert.deepStrictEqual(br.posted[2].msg, { source: 'cc-ext', requestId: 'r1', result: { status: 'picked', echo: 'REVOKE' } });
+  console.log('[7] bridge: READY·PING·중계 정상, 다른 출처/형식 무시');
 
   console.log('\n✅ 확장 로직 검증 통과');
 })().catch((e) => { console.error('❌', e); process.exit(1); });

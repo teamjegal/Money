@@ -162,4 +162,4 @@ async function classifyGroups(groups, opts = {}) {
   return { mode, model: client ? MODEL : null, errors, items };
 }
 
-module.exports = { classifyGroups, ruleJudge, parseJsonArray };
+module.exports = { classifyGroups, ruleJudge, parseJsonArray, getClient, textOf, MODEL };

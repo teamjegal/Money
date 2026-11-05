@@ -29,4 +29,18 @@
 | 확장 → 웹 | `{ source: "cc-ext", type: "READY" }` |
 | 웹 → 확장 | `{ source: "cc-web", type: "PING" }` (READY를 놓쳤을 때) |
 | 웹 → 확장 | `{ source: "cc-web", requestId, type: "REVOKE", payload: { service, domain, settings_url } }` |
-| 확장 → 웹 | `{ source: "cc-ext", requestId, result: { status: "opened", tabId, url } }` 또는 `{ status: "error", error }` |
+| 확장 → 웹 | `{ source: "cc-ext", requestId, result }` |
+
+`result` 종류:
+- `{ status: "picked", tabId, url, mode, targets: [{id, reason, label}], save_id, save_label, removed, scanned }` — 해제 대상 선택 완료 (아직 클릭 안 함)
+- `{ status: "need_login", tabId, error }` — 2분 안에 로그인하지 않음
+- `{ status: "error", error }`
+
+## REVOKE 처리 순서 (background.js)
+
+1. `settings_url`을 새 탭으로 열고 로딩 완료 대기
+2. `scan.js` 주입 → 비밀번호 칸이 보이면 `need_login`, 사용자가 로그인해 페이지가 바뀌면 다시 스캔 (최대 2분)
+3. 컨트롤마다 `data-cc-id` 부여, 라벨 추출 (label[for] → 감싸는 label → aria-label → aria-labelledby → 옆 텍스트, 버튼·링크는 자기 글자)
+4. **안전 필터**: 탈퇴/삭제/해지/결제/구매/비밀번호/로그아웃 포함 요소 제거 (서버 `server/safety.js`에도 같은 규칙)
+5. `POST http://localhost:3000/api/pick-targets` → 서버가 다시 거르고 LLM 또는 키워드 규칙으로 선택
+6. 응답 id가 4번의 안전한 목록 안에 있는지 다시 확인 → 결과를 콘솔에 찍고 웹에 응답

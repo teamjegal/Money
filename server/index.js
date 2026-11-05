@@ -4,6 +4,7 @@ const path = require('path');
 const express = require('express');
 const { analyzeMailText } = require('./mbox');
 const { classifyGroups } = require('./llm');
+const { pickTargets } = require('./pick');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,9 +38,20 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// 설정 페이지 컨트롤 → 해제 대상
-app.post('/api/pick-targets', (req, res) => {
-  res.json({ targets: [], save_id: null });
+// 설정 페이지 컨트롤 → 해제 대상 (클릭은 확장이 사용자 승인 후에)
+// 판단 방식은 응답 헤더 X-Pick-Mode (llm | rules | rules-fallback)
+app.post('/api/pick-targets', async (req, res) => {
+  const { url, controls } = req.body || {};
+  if (!Array.isArray(controls)) return res.status(400).json({ error: 'controls 배열이 필요합니다.' });
+  try {
+    const { mode, targets, save_id } = await pickTargets({ url, controls });
+    console.log(`[pick-targets] ${mode}: 대상 ${targets.length}개, 저장 ${save_id}`);
+    res.set('X-Pick-Mode', mode);
+    res.json({ targets, save_id });
+  } catch (e) {
+    console.error('[pick-targets] 실패:', e);
+    res.status(500).json({ error: '해제 대상 선택 중 오류가 발생했습니다.' });
+  }
 });
 
 // 개인정보 삭제 요청 메일 초안
