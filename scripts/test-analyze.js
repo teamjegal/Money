@@ -30,7 +30,7 @@ function fakeClient(replies) {
 }
 // 입력 그룹을 읽어 그럴듯한 LLM 응답(JSON) 생성
 const goodReply = (groups) => (params) => {
-  const domains = [...params.messages[0].content.matchAll(/"domain": "([^"]+)"/g)].map((m) => m[1]);
+  const domains = [...params.messages[0].content.matchAll(/"domain":\s*"([^"]+)"/g)].map((m) => m[1]);
   const arr = domains.map((d) => {
     const r = ruleJudge(groups.find((g) => g.domain === d), TODAY);
     return { ...r, reason: `[LLM] ${r.reason}` };
@@ -58,9 +58,9 @@ const goodReply = (groups) => (params) => {
   // 2) 가짜 LLM 정상 응답 (코드블록 감싸도 파싱)
   const c2 = fakeClient([goodReply(groups)]);
   const b = await classifyGroups(groups, { client: c2, today: TODAY });
-  console.log(`\n[2] 가짜 LLM 정상 → mode=${b.mode}, 호출 ${c2.calls()}회 (10개씩 배치)`);
+  console.log(`\n[2] 가짜 LLM 정상 → mode=${b.mode}, 호출 ${c2.calls()}회 (20개씩 배치)`);
   assert.strictEqual(b.mode, 'llm');
-  assert.strictEqual(c2.calls(), 2);
+  assert.strictEqual(c2.calls(), 1); // 15그룹 → 20개씩 배치라 1번
   assert.ok(b.items.every((x) => x.reason.startsWith('[LLM]')));
 
   // 3) 첫 응답 깨짐 → 재시도 성공

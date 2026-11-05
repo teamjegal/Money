@@ -15,6 +15,8 @@ const CFG = {
   months: num(process.env.GMAIL_MONTHS, 12),
   max: num(process.env.GMAIL_MAX_MESSAGES, 1500),
   concurrency: num(process.env.GMAIL_CONCURRENCY, 10),
+  tries: 5,
+  retryBaseMs: 1000,
 };
 
 // ---- 메모리 상태 (서버를 끄면 사라진다. 파일·DB 저장 금지) ----
@@ -33,13 +35,16 @@ function gmailApi() {
 }
 const statusOf = (e) => e?.code || e?.response?.status || e?.status;
 
-// 일시적 오류(429, 5xx)는 잠깐 쉬었다 다시
-async function withRetry(fn, tries = 3) {
+// 일시적 오류는 잠깐 쉬었다 다시: 429, 5xx, 그리고 Gmail이 403으로 주는 사용자별 속도·동시 요청 제한
+const isTransient = (e) => {
+  const s = +statusOf(e);
+  return s === 429 || s >= 500 || /rate|quota|concurrent|backend|ECONNRESET|ETIMEDOUT|socket/i.test(e.message);
+};
+async function withRetry(fn, tries = 5, baseMs = 1000) {
   for (let i = 0; ; i++) {
     try { return await fn(); } catch (e) {
-      const s = +statusOf(e);
-      if (i >= tries - 1 || !(s === 429 || s >= 500 || /rate/i.test(e.message))) throw e;
-      await sleep(800 * 2 ** i);
+      if (i >= tries - 1 || !isTransient(e)) throw e;
+      await sleep(baseMs * 2 ** i + Math.random() * 300); // 1s, 2s, 4s, 8s (+ 흔들기)
     }
   }
 }
@@ -78,29 +83,45 @@ async function runJob(job, gmail, opts = {}) {
     // 2) 헤더만 병렬로 (동시 cfg.concurrency개)
     job.phase = 'fetching';
     const raws = new Array(ids.length);
-    let next = 0;
-    const worker = async () => {
-      while (next < ids.length && !job.cancelled) {
-        const i = next++;
-        try {
-          const { data } = await withRetry(() => gmail.users.messages.get({
-            userId: 'me', id: ids[i], format: 'metadata', metadataHeaders: HEADERS,
-          }));
-          raws[i] = toRawHeaders(data);
-        } catch (e) {
-          if (+statusOf(e) === 401) throw e; // 토큰 만료는 전체 중단
-          job.failed++;
-        }
-        job.done++;
+    const reasons = {}; // 실패 이유별 개수 (로그용, 메일 내용 없음)
+    const fetchOne = async (i) => {
+      try {
+        const { data } = await withRetry(() => gmail.users.messages.get({
+          userId: 'me', id: ids[i], format: 'metadata', metadataHeaders: HEADERS,
+        }), cfg.tries, cfg.retryBaseMs);
+        raws[i] = toRawHeaders(data);
+        return true;
+      } catch (e) {
+        if (+statusOf(e) === 401) throw e; // 토큰 만료는 전체 중단
+        const key = `${statusOf(e) || '-'} ${String(e.message).slice(0, 80)}`;
+        reasons[key] = (reasons[key] || 0) + 1;
+        return false;
       }
     };
-    await Promise.all(Array.from({ length: Math.min(cfg.concurrency, ids.length || 1) }, worker));
+    const pool = async (list, n, onEach) => {
+      let next = 0;
+      const worker = async () => {
+        while (next < list.length && !job.cancelled) { const i = list[next++]; await onEach(i, await fetchOne(i)); }
+      };
+      await Promise.all(Array.from({ length: Math.min(n, list.length || 1) }, worker));
+    };
+    const failedIdx = [];
+    await pool(ids.map((_, i) => i), cfg.concurrency, (i, ok) => { if (!ok) failedIdx.push(i); job.done++; });
+    job.failed = failedIdx.length;
+    // 2-1) 실패한 것만 천천히 한 번 더 (동시 2개)
+    if (failedIdx.length && !job.cancelled) {
+      job.phase = 'retrying';
+      await sleep(cfg.retryBaseMs);
+      await pool(failedIdx, 2, (i, ok) => { if (ok) job.failed--; });
+    }
+    if (Object.keys(reasons).length) console.warn(`[gmail] 헤더 읽기 실패 ${job.failed}/${ids.length}통, 이유:`, reasons);
     if (job.cancelled) return;
 
     // 3) 기존 mbox.js 그룹핑·신호 추출 → 4) 기존 분류(LLM 또는 규칙)
     job.phase = 'grouping';
     const mails = await parseRawMessages(raws.filter(Boolean));
-    const groups = groupByDomain(mails);
+    // 내 메일이 회사·학교 주소면 그 도메인 메일은 "기관" (주소 자체는 LLM에 보내지 않음)
+    const groups = groupByDomain(mails, { selfDomain: mem.email ? mem.email.split('@')[1] : null });
     job.phase = 'classifying';
     const result = await classifyGroups(groups);
     if (job.cancelled) return;

@@ -2,14 +2,17 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { ANALYZE_SYSTEM, buildAnalyzeUser, RETRY_HINT } = require('./prompts');
 const KNOWN = require('./services.json');
+const { mergeByService } = require('./merge');
 
 const MODEL = process.env.MODEL || 'claude-sonnet-5-5';
-const BATCH = 10;
-const RISK_ORDER = { high: 0, medium: 1, low: 2 };
-const CATEGORIES = ['쇼핑', '배달', '여행', '영화', '공연', '도서', '교육', '금융', '뉴스', '운동', '중고거래', '반려동물', '인테리어', '기타'];
+const BATCH = 20; // 도메인 그룹 20개씩 한 번에
+const RISK_ORDER = { high: 0, medium: 1, low: 2, review: 3 }; // review: 확인 필요 (낮은 우선순위)
+const CATEGORIES = ['쇼핑', '배달', '여행', '영화', '공연', '도서', '교육', '금융', '뉴스', '운동', '중고거래', '반려동물', '인테리어', 'SNS', '기관', '기타'];
 
 // 카테고리 추정용 키워드 (이름 + 제목에서 찾음)
 const CATEGORY_HINTS = [
+  ['SNS', /facebook|instagram|twitter|linkedin|tiktok|discord|threads|pinterest|reddit|페이스북|인스타그램|카카오스토리/i],
+  ['영화', /netflix|youtube|disney|wavve|tving|watcha|coupang ?play|넷플릭스|유튜브|티빙|왓챠/i],
   ['배달', /배달|배고파|음식|치킨/], ['여행', /여행|호텔|숙소|항공|호캉스/], ['영화', /영화|시네마|극장|팝콘/],
   ['공연', /공연|뮤지컬|콘서트|티켓/], ['도서', /책|도서|서점|베스트셀러/], ['교육', /강의|수강|클래스|배움|자격증/],
   ['금융', /가계부|은행|카드|머니|동전|금융/], ['뉴스', /뉴스|레터|소식/], ['운동', /운동|피트|핏|런|헬스/],
@@ -28,24 +31,33 @@ function guessCategory(g) {
 }
 
 function ruleJudge(g, today) {
-  const ads = g.counts.ad, sinceOrder = g.last_order ? daysBetween(g.last_order, today) : null;
+  const base = { domain: g.domain, service: g.name };
+  // 학교·공공기관·내 회사: 해제 대상 아님
+  if (g.kind === 'institution') {
+    return { ...base, category: '기관', marketing_consent: false, risk: 'low', reason: '학교·공공기관·회사 메일이라 해제 대상이 아니에요' };
+  }
+  const ads = g.counts.ad + (g.counts.promo || 0), sinceOrder = g.last_order ? daysBetween(g.last_order, today) : null;
+  const adWord = g.counts.ad ? '광고' : '마케팅·알림성 메일';
   let risk, reason;
-  if (g.counts.dormant) {
+  if (g.weak) {
+    risk = 'review';
+    reason = `메일 ${g.count}통뿐이고 가입·이용 신호가 없어 확인이 필요해요`;
+  } else if (g.counts.dormant) {
     risk = 'high';
     reason = `${g.last_dormant} 휴면 전환 안내를 받음` + (ads ? ` · 광고 ${ads}건` : '');
   } else if (ads && (sinceOrder === null || sinceOrder >= 365)) {
     risk = 'high';
     reason = g.last_order
-      ? `광고는 ${g.last_ad}까지 오는데 마지막 주문은 ${g.last_order}`
-      : `주문 기록 없이 광고만 ${ads}건 수신`;
+      ? `${adWord}은 ${g.last_ad}까지 오는데 마지막 주문은 ${g.last_order}`
+      : `주문 기록 없이 ${adWord}만 ${ads}건 수신`;
   } else if (ads) {
     risk = 'medium';
-    reason = `광고 수신 중이고 ${g.last_order}에 주문 기록 있음`;
+    reason = `${adWord} 수신 중이고 ${g.last_order}에 주문 기록 있음`;
   } else {
     risk = 'low';
     reason = '광고 없이 정보성 메일만 수신';
   }
-  return { domain: g.domain, service: g.name, category: guessCategory(g), marketing_consent: ads > 0, risk, reason };
+  return { ...base, category: guessCategory(g), marketing_consent: ads > 0, risk, reason };
 }
 
 // ---- LLM 응답 파싱 ----
@@ -102,12 +114,22 @@ async function llmBatch(client, groups, today) {
   }
 }
 
+function enforce(g, judged) {
+  if (g.kind === 'institution') return { ...judged, category: '기관', risk: 'low', marketing_consent: false };
+  if (g.weak) return { ...judged, risk: 'review' };
+  if (judged.risk === 'review') return { ...judged, risk: 'low' };
+  return judged;
+}
+
 // 최종 서비스 항목 형식으로 합치기 (사실 정보는 메일에서, 판단은 LLM/규칙에서)
 function toServiceItem(g, judged) {
   const known = KNOWN[g.domain] || {};
   return {
     service: known.service || judged.service,
     domain: g.domain,
+    domains: g.domains || [g.domain],
+    kind: g.kind || 'service', // institution 이면 해제·수신거부 버튼 없음
+    needs_review: !!g.weak,
     category: known.category || judged.category,
     signals: g.signals,
     marketing_consent: judged.marketing_consent,
@@ -117,7 +139,7 @@ function toServiceItem(g, judged) {
     reason: judged.reason,
     unsubscribe: g.unsubscribe,
     unsubscribe_one_click: !!g.unsubscribe_one_click,
-    settings_url: known.settings_url || null,
+    settings_url: g.kind === 'institution' ? null : known.settings_url || null,
     contact_email: known.contact_email || g.contact_email || null,
     mail_count: g.count,
     subjects: g.subjects,
@@ -137,8 +159,8 @@ function getClient() {
 async function classifyGroups(groups, opts = {}) {
   const today = opts.today || todayStr();
   const client = opts.client !== undefined ? opts.client : getClient();
-  const items = [];
   const errors = [];
+  const allJudged = [];
 
   for (let i = 0; i < groups.length; i += BATCH) {
     const batch = groups.slice(i, i + BATCH);
@@ -153,8 +175,13 @@ async function classifyGroups(groups, opts = {}) {
         console.warn(`[llm] 배치 ${i / BATCH + 1} 실패 → 규칙 기반 대체: ${e.message}`);
       }
     }
-    batch.forEach((g, j) => items.push(toServiceItem(g, judged[j])));
+    allJudged.push(...judged);
   }
+  // 같은 회사(서비스명)끼리 합친 뒤, 규칙 모드면 합친 결과로 다시 판단
+  const items = mergeByService(groups, allJudged).map(({ group, judged }) => {
+    const j = judged.by === 'rules' ? { ...ruleJudge(group, today), by: 'rules' } : judged;
+    return toServiceItem(group, enforce(group, j));
+  });
   // llm: 전부 LLM / rules: 키 없음 / rules-fallback: LLM 전부 실패 / mixed: 일부만 실패
   const llmCount = items.filter((x) => x.judged_by === 'llm').length;
   const mode = !client ? 'rules' : llmCount === items.length ? 'llm' : llmCount === 0 ? 'rules-fallback' : 'mixed';

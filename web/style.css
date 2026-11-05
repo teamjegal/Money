@@ -152,6 +152,12 @@ textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; backgro
 .badge.high { background: var(--high-soft); color: var(--high); }
 .badge.medium { background: var(--mid-soft); color: var(--mid); }
 .badge.low { background: var(--low-soft); color: var(--low); }
+.badge.review { background: #eef1f5; color: var(--muted); }
+.badge.inst { background: #ece9fb; color: #5b47c4; }
+.check-spacer { width: 20px; flex-shrink: 0; }
+details.inst { margin-top: 18px; }
+details.inst summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted); padding: 6px 0; }
+details.inst[open] summary { margin-bottom: 8px; }
 .done-tag { font-size: 12px; color: var(--low); font-weight: 700; }
 .buttons { display: flex; gap: 6px; flex-shrink: 0; }
 .chev { width: 28px; height: 28px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; flex-shrink: 0; transition: transform .2s; }

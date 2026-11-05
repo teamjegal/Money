@@ -1,26 +1,28 @@
 // .mbox 또는 붙여넣은 메일 텍스트 → 메일 목록 → 서비스(도메인)별 그룹
 const { simpleParser } = require('mailparser');
+const { baseDomain, isPersonal, isInstitution } = require('./domains');
 
 // mbox 구분줄: "From 보낸사람 요일 월 일 시:분:초 연도"
 const FROM_LINE = /^From \S+ +\w{3} \w{3} +\d{1,2} \d{2}:\d{2}(:\d{2})? \d{4}/;
 
-// 두 단계 공용 도메인 (예: shop.co.kr → 마지막 3단계가 서비스)
-const SECOND_LEVEL = new Set(['co', 'or', 'ne', 'go', 'ac', 're', 'pe', 'com', 'net', 'org']);
-
-// 메일 종류 판별 규칙 (위에 있을수록 우선)
+// 메일 종류 판별 규칙 (위에 있을수록 우선). 해외 서비스는 "(광고)" 표기가 없어서 영어 키워드도 본다.
 const RULES = [
   { type: 'ad', re: /[(\[]\s*광고\s*[)\]]/ },
-  { type: 'dormant', re: /휴면|장기\s*미이용/ },
-  { type: 'privacy', re: /개인정보\s*(이용|처리)\s*내역/ },
-  { type: 'signup', re: /가입을?\s*환영|회원\s*가입이?\s*완료|가입이\s*완료|이메일\s*인증|본인\s*인증/ },
-  { type: 'order', re: /주문|결제\s*완료|영수증|예매\s*완료|예약\s*완료|구매\s*완료/ },
+  { type: 'dormant', re: /휴면|장기\s*미이용|inactive account|account (will be|has been) (deleted|deactivated|closed)/i },
+  { type: 'security', re: /보안\s*(알림|경고)|로그인\s*(알림|시도)|새로운\s*(기기|로그인)|인증\s*(코드|번호)|비밀번호\s*(변경|재설정)|security alert|new (sign-?in|login|device)|verification code|password (reset|changed)|2-step/i },
+  { type: 'privacy', re: /개인정보\s*(이용|처리)\s*(내역|방침)|이용\s*약관|privacy (policy|notice)|terms of (service|use)/i },
+  { type: 'signup', re: /가입을?\s*환영|회원\s*가입이?\s*완료|가입이\s*완료|이메일\s*인증|본인\s*인증|welcome to|verify your (email|account)|confirm your (email|account)|account (created|confirmed)/i },
+  { type: 'order', re: /주문(이|이\s*완료|\s*완료|\s*확인|\s*내역|번호)|결제\s*(완료|안내|내역)|영수증|예매\s*완료|예약\s*(완료|확정)|구매\s*완료|구독\s*(갱신|결제)|청구서|receipt|invoice|your order|order (confirm|#|\d)|payment (received|confirm)|billing|subscription (renew|confirm)/i },
+  { type: 'promo', body: false, re: /할인|쿠폰|특가|세일|이벤트|혜택|적립|프로모션|기획전|신상|무료\s*배송|단독|오늘만|마감\s*임박|\d+\s*%|sale\b|deals?\b|offer|discount|coupon|promo|newsletter|뉴스레터|digest|weekly|new arrivals|don'?t miss|limited time/i },
 ];
 
 const LABELS = {
   ad: (n) => `광고 메일 ${n}건`,
+  promo: (n) => `마케팅·알림성 메일 ${n}건`,
   signup: () => '가입 환영/인증 메일',
-  privacy: () => '개인정보 이용내역 안내',
+  privacy: () => '개인정보·약관 안내',
   dormant: () => '휴면 전환 안내',
+  security: () => '보안·로그인 알림',
   order: (n) => `주문/결제 메일 ${n}건`,
 };
 
@@ -72,10 +74,14 @@ function pickUnsubscribe(parsed) {
   return m ? m[1] : null;
 }
 
-function classify(subject, body) {
+// 본문으로는 판단하지 않는 종류: 광고 표기는 제목 기준, 할인·보안 단어는 본문 꼬리말에 흔해서
+const SUBJECT_ONLY = new Set(['ad', 'promo', 'security']);
+
+function classify(subject, body, hasUnsubscribe = false) {
   for (const r of RULES) if (r.re.test(subject)) return r.type;
-  for (const r of RULES) if (r.type !== 'ad' && r.re.test(body)) return r.type;
-  return 'info';
+  for (const r of RULES) if (!SUBJECT_ONLY.has(r.type) && r.re.test(body)) return r.type;
+  // 수신거부 링크(List-Unsubscribe)가 붙은 대량 발송 메일 = 마케팅·알림성
+  return hasUnsubscribe ? 'promo' : 'info';
 }
 
 // 메일 원문 하나 파싱
@@ -104,7 +110,8 @@ async function parseOne(raw) {
     oneClick: /one-click/i.test(typeof post === 'string' ? post : JSON.stringify(post || '')), // RFC 8058 원클릭 수신거부
     snippet: text.slice(0, 500),
     contactEmail: contact ? contact[0].toLowerCase() : null,
-    type: classify(subject, text),
+    // 헤더의 List-Unsubscribe만 대량 발송 신호로 본다 (본문 속 "수신거부" 링크는 제외)
+    type: classify(subject, text, !!(parsed.headers.get('list') || {}).unsubscribe),
   };
 }
 
@@ -126,62 +133,57 @@ async function parseRawMessages(raws) {
   return out;
 }
 
-// mail.xxx.com, news.xxx.co.kr → xxx.com, xxx.co.kr
-function baseDomain(domain) {
-  const parts = domain.toLowerCase().split('.').filter(Boolean);
-  if (parts.length <= 2) return parts.join('.');
-  const n = SECOND_LEVEL.has(parts[parts.length - 2]) && parts[parts.length - 1].length === 2 ? 3 : 2;
-  return parts.slice(-n).join('.');
-}
+// 그룹 이름·종류별 건수 → 화면에 보일 신호 문구
+const signalsOf = (counts) => Object.keys(LABELS).filter((t) => counts[t]).map((t) => LABELS[t](counts[t]));
+const ACCOUNT_SIGNALS = ['signup', 'privacy', 'order', 'dormant', 'security']; // 가입·이용이 확실한 신호
 
-// 개인 메일 서비스 도메인: 친구·동료가 보낸 메일이라 "가입한 서비스"가 아니다
-const PERSONAL_DOMAINS = new Set(['gmail.com', 'googlemail.com', 'naver.com', 'daum.net', 'hanmail.net', 'kakao.com',
-  'nate.com', 'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com']);
-
-function groupByDomain(mails) {
+// selfDomain: 사용자 메일 주소의 도메인 (회사·학교 메일이면 그 도메인은 "기관")
+function groupByDomain(mails, { selfDomain } = {}) {
   const groups = new Map();
   for (const m of mails) {
     const domain = baseDomain(m.from.split('@')[1] || '');
-    if (!domain || PERSONAL_DOMAINS.has(domain)) continue;
+    if (!domain || isPersonal(domain)) continue; // 개인 간 메일 제외
     if (!groups.has(domain)) groups.set(domain, { domain, mails: [] });
     groups.get(domain).mails.push(m);
   }
-  return [...groups.values()].map(summarize).sort((a, b) => b.count - a.count);
+  return [...groups.values()].map((g) => summarize(g, selfDomain)).sort((a, b) => b.count - a.count);
 }
 
-function summarize({ domain, mails }) {
+function summarize({ domain, mails }, selfDomain) {
   // 날짜 있는 것 먼저, 최신순
   const sorted = [...mails].sort((a, b) => (b.date || 0) - (a.date || 0));
   const dated = sorted.filter((m) => m.date);
-  const counts = { ad: 0, signup: 0, privacy: 0, dormant: 0, order: 0, info: 0 };
+  const counts = { ad: 0, promo: 0, signup: 0, privacy: 0, dormant: 0, security: 0, order: 0, info: 0 };
   const lastByType = {};
   for (const m of sorted) {
-    counts[m.type]++;
+    counts[m.type] = (counts[m.type] || 0) + 1;
     if (!lastByType[m.type] && m.date) lastByType[m.type] = toDateStr(m.date);
   }
   // 표시 이름: 가장 많이 쓰인 발신자 이름
   const nameCount = {};
   for (const m of mails) if (m.fromName) nameCount[m.fromName] = (nameCount[m.fromName] || 0) + 1;
   const name = Object.entries(nameCount).sort((a, b) => b[1] - a[1])[0]?.[0] || domain.split('.')[0];
-
-  const subjects = [...new Set(sorted.map((m) => m.subject).filter(Boolean))].slice(0, 8);
-  const signals = Object.keys(LABELS).filter((t) => counts[t]).map((t) => LABELS[t](counts[t]));
+  const lastMarketing = [lastByType.ad, lastByType.promo].filter(Boolean).sort().pop() || null;
 
   return {
     name,
     domain,
+    domains: [domain],
+    kind: isInstitution(domain, selfDomain) ? 'institution' : 'service',
     count: mails.length,
     first_seen: dated.length ? toDateStr(dated[dated.length - 1].date) : null,
     last_seen: dated.length ? toDateStr(dated[0].date) : null,
-    subjects,
+    subjects: [...new Set(sorted.map((m) => m.subject).filter(Boolean))].slice(0, 8),
     unsubscribe: sorted.find((m) => m.unsubscribe)?.unsubscribe || null,
     unsubscribe_one_click: !!sorted.find((m) => m.unsubscribe)?.oneClick,
     contact_email: sorted.find((m) => m.contactEmail)?.contactEmail || null,
     counts,
-    last_ad: lastByType.ad || null,
+    last_ad: lastMarketing, // 광고 + 마케팅·알림성 중 가장 최근
     last_order: lastByType.order || null,
     last_dormant: lastByType.dormant || null,
-    signals,
+    // 1~2통뿐이고 가입·이용 신호가 없으면 "확인 필요" (진짜 가입했는지 불확실)
+    weak: mails.length <= 2 && !ACCOUNT_SIGNALS.some((t) => counts[t]),
+    signals: signalsOf(counts),
     snippets: sorted.slice(0, 3).map((m) => m.snippet.slice(0, 200)),
   };
 }
@@ -192,4 +194,4 @@ async function analyzeMailText(text) {
   return { total: mails.length, groups: groupByDomain(mails) };
 }
 
-module.exports = { analyzeMailText, parseMessages, parseRawMessages, groupByDomain, splitMessages, baseDomain, classify };
+module.exports = { analyzeMailText, parseMessages, parseRawMessages, groupByDomain, splitMessages, baseDomain, classify, signalsOf };

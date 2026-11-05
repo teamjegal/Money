@@ -1,7 +1,9 @@
 // 동의 클리너 — 체크리스트 화면
 (() => {
   const $ = (id) => document.getElementById(id);
-  const RISK_LABEL = { high: '위험 높음', medium: '보통', low: '낮음' };
+  const RISK_LABEL = { high: '위험 높음', medium: '보통', low: '낮음', review: '확인 필요' };
+  const isInst = (x) => x.kind === 'institution';
+  const services = () => items.filter((x) => !isInst(x)); // 기관 메일은 정리 대상에서 뺀다
   const MODE_LABEL = {
     llm: 'AI가 판단했어요',
     rules: '규칙 기반으로 판단했어요 (AI 키 없음)',
@@ -122,20 +124,25 @@
     $('result').hidden = items.length === 0;
     if (!items.length) return;
 
-    $('s-total').textContent = items.length;
-    $('s-ads').textContent = items.filter((x) => x.marketing_consent).length;
-    $('s-high').textContent = items.filter((x) => x.risk === 'high').length;
+    const svc = services(), inst = items.filter(isInst);
+    $('s-total').textContent = svc.length;
+    $('s-ads').textContent = svc.filter((x) => x.marketing_consent).length;
+    $('s-high').textContent = svc.filter((x) => x.risk === 'high').length;
     $('mode').textContent = MODE_LABEL[mode] || '';
 
     const list = $('list');
     const openSet = new Set([...list.querySelectorAll('.item.open')].map((el) => el.dataset.domain));
-    list.innerHTML = items.map((x) => rowHtml(x, openSet.has(x.domain))).join('');
+    list.innerHTML = svc.map((x) => rowHtml(x, openSet.has(x.domain))).join('');
+    // 학교·공공기관·회사 메일: 접어서 따로, 버튼 없음
+    $('inst').hidden = !inst.length;
+    $('inst-count').textContent = inst.length;
+    $('inst-list').innerHTML = inst.map((x) => rowHtml(x, openSet.has(x.domain))).join('');
     renderProgress();
   }
 
   function rowHtml(x, open) {
     const isDone = !!done[x.domain];
-    const buttons = [
+    const buttons = isInst(x) ? '' : [
       x.settings_url ? `<button class="btn sm ai" data-act="ai">AI로 해제</button>` : '',
       x.unsubscribe ? `<button class="btn sm" data-act="unsub">수신거부</button>` : '',
       `<button class="btn sm" data-act="delete">삭제 요청 메일</button>`,
@@ -145,11 +152,11 @@
     return `
       <li class="item${isDone ? ' done' : ''}${open ? ' open' : ''}" data-domain="${esc(x.domain)}">
         <div class="row" data-act="toggle">
-          <input type="checkbox" class="check" data-act="check" ${isDone ? 'checked' : ''} aria-label="${esc(x.service)} 처리 완료">
+          ${isInst(x) ? '<span class="check-spacer"></span>' : `<input type="checkbox" class="check" data-act="check" ${isDone ? 'checked' : ''} aria-label="${esc(x.service)} 처리 완료">`}
           <div class="main">
             <div class="title-line">
               <span class="name">${esc(x.service)}</span>
-              <span class="badge ${esc(x.risk)}">${RISK_LABEL[x.risk] || esc(x.risk)}</span>
+              ${isInst(x) ? '<span class="badge inst">기관</span>' : `<span class="badge ${esc(x.risk)}">${RISK_LABEL[x.risk] || esc(x.risk)}</span>`}
               ${isDone ? '<span class="done-tag">✓ 완료</span>' : ''}
             </div>
             <div class="meta">${esc(x.category)} · 마지막 메일 ${esc(x.last_seen || '-')}</div>
@@ -162,14 +169,15 @@
           <div class="reason"><span class="by">${by}</span>${esc(x.reason)}</div>
           <h3>메일에서 찾은 신호</h3>
           <ul class="signals">${signals}</ul>
-          <div class="facts">${esc(x.domain)} · 메일 ${esc(x.mail_count ?? '-')}통 · ${esc(x.first_seen || '-')} ~ ${esc(x.last_seen || '-')}</div>
+          <div class="facts">${esc((x.domains || [x.domain]).join(', '))} · 메일 ${esc(x.mail_count ?? '-')}통 · ${esc(x.first_seen || '-')} ~ ${esc(x.last_seen || '-')}</div>
         </div>
       </li>`;
   }
 
   function renderProgress() {
-    const total = items.length;
-    const n = items.filter((x) => done[x.domain]).length;
+    const svc = services();
+    const total = svc.length;
+    const n = svc.filter((x) => done[x.domain]).length;
     const pct = total ? Math.round((n / total) * 100) : 0;
     $('p-done').textContent = n;
     $('p-total').textContent = total;
@@ -184,6 +192,14 @@
   }
 
   // ---- 행 이벤트 (위임) ----
+  // 기관 목록은 펼치기만
+  $('inst-list').addEventListener('click', (e) => {
+    const li = e.target.closest('.item');
+    if (!li || !e.target.closest('[data-act=toggle]')) return;
+    const open = li.classList.toggle('open');
+    li.querySelector('.chev').setAttribute('aria-expanded', open);
+  });
+
   $('list').addEventListener('click', (e) => {
     const li = e.target.closest('.item');
     if (!li) return;

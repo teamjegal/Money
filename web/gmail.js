@@ -5,6 +5,7 @@
   const PHASE = {
     starting: '분석 준비 중…',
     listing: '메일 목록 가져오는 중…',
+    retrying: '읽지 못한 메일 다시 시도 중…',
     grouping: '서비스별로 묶는 중…',
     classifying: '위험도 판단 중…',
   };
@@ -43,7 +44,8 @@
       pct = job.total ? (job.done / job.total) * 90 : 0;
     } else {
       text = job.phase === 'listing' && job.total ? `메일 목록 가져오는 중… (${job.total.toLocaleString('ko-KR')}통)` : PHASE[job.phase] || '진행 중…';
-      pct = { starting: 0, listing: 2, grouping: 92, classifying: 95, done: 100 }[job.phase] ?? 0;
+      if (job.phase === 'retrying') text = `읽지 못한 메일 ${job.failed}통 다시 시도 중…`;
+      pct = { starting: 0, listing: 2, retrying: 90, grouping: 92, classifying: 95, done: 100 }[job.phase] ?? 0;
     }
     $('gp-text').textContent = text;
     $('gp-pct').textContent = `${Math.round(pct)}%`;
