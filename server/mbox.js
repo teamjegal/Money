@@ -8,11 +8,12 @@ const FROM_LINE = /^From \S+ +\w{3} \w{3} +\d{1,2} \d{2}:\d{2}(:\d{2})? \d{4}/;
 // 메일 종류 판별 규칙 (위에 있을수록 우선). 해외 서비스는 "(광고)" 표기가 없어서 영어 키워드도 본다.
 const RULES = [
   { type: 'ad', re: /[(\[]\s*광고\s*[)\]]/ },
-  { type: 'dormant', re: /휴면|장기\s*미이용|inactive account|account (will be|has been) (deleted|deactivated|closed)/i },
+  // 휴면 + 계정 삭제 예고 (LLM이 실제 메일함에서 찾은 신호를 규칙에도 반영)
+  { type: 'dormant', re: /휴면|장기\s*미이용|계정\s*(삭제|정지)\s*(예정|예고|안내)|삭제\s*예정|inactive account|account (will be|has been|is scheduled to be) (deleted|deactivated|closed)|account deletion|will be (permanently )?deleted|scheduled for deletion/i },
   { type: 'security', re: /보안\s*(알림|경고)|로그인\s*(알림|시도)|새로운\s*(기기|로그인)|인증\s*(코드|번호)|비밀번호\s*(변경|재설정)|security alert|new (sign-?in|login|device)|verification code|password (reset|changed)|2-step/i },
   { type: 'privacy', re: /개인정보\s*(이용|처리)\s*(내역|방침)|이용\s*약관|privacy (policy|notice)|terms of (service|use)/i },
   { type: 'signup', re: /가입을?\s*환영|회원\s*가입이?\s*완료|가입이\s*완료|이메일\s*인증|본인\s*인증|welcome to|verify your (email|account)|confirm your (email|account)|account (created|confirmed)/i },
-  { type: 'order', re: /주문(이|이\s*완료|\s*완료|\s*확인|\s*내역|번호)|결제\s*(완료|안내|내역)|영수증|예매\s*완료|예약\s*(완료|확정)|구매\s*완료|구독\s*(갱신|결제)|청구서|receipt|invoice|your order|order (confirm|#|\d)|payment (received|confirm)|billing|subscription (renew|confirm)/i },
+  { type: 'order', re: /주문(이|이\s*완료|\s*완료|\s*확인|\s*내역|번호)|결제\s*(완료|안내|내역)|영수증|예매\s*완료|예약\s*(완료|확정)|구매\s*완료|구독\s*(갱신|결제)|청구서|거래\s*(확인|내역)|이용\s*내역|송금|receipt|transaction|invoice|your order|order (confirm|#|\d)|payment (received|confirm)|billing|subscription (renew|confirm)/i },
   { type: 'promo', body: false, re: /할인|쿠폰|특가|세일|이벤트|혜택|적립|프로모션|기획전|신상|무료\s*배송|단독|오늘만|마감\s*임박|\d+\s*%|sale\b|deals?\b|offer|discount|coupon|promo|newsletter|뉴스레터|digest|weekly|new arrivals|don'?t miss|limited time/i },
 ];
 

@@ -36,6 +36,14 @@ const RAWS = [
   mail('국민건강보험 <info@nhis.or.kr>', '건강검진 안내', d('2026-07-01')),
   // 1통뿐, 가입 신호 없음 → 확인 필요
   mail('어딘가 <hello@random-startup.io>', '안녕하세요 소개드립니다', d('2026-05-01')),
+  // LLM이 실제 메일함에서 찾은 신호 → 규칙에도 반영
+  mail('Use AI <hello@use.ai>', 'Your account will be deleted in 30 days', d('2026-06-27'), 'https://use.ai/u'),
+  mail('Use AI <hello@use.ai>', 'New features this week', d('2026-06-01'), 'https://use.ai/u'),
+  mail('Use AI <hello@use.ai>', 'Tips for you', d('2026-05-01'), 'https://use.ai/u'),
+  mail('카카오페이 <noreply@kakaopaycorp.com>', '[카카오페이] 거래확인증', d('2026-10-15')),
+  mail('Helpdesk <tips@helpful.example>', 'How to delete your account? Tips', d('2026-10-01'), 'https://helpful.example/u'),
+  mail('Helpdesk <tips@helpful.example>', 'Weekly digest', d('2026-09-01'), 'https://helpful.example/u'),
+  mail('Helpdesk <tips@helpful.example>', 'Your weekly summary', d('2026-08-01'), 'https://helpful.example/u'),
   // noreply 이름이 같은 서로 다른 회사 → 합치면 안 됨
   mail('noreply <noreply@alpha-svc.com>', '[알파] 회원가입 완료', d('2025-01-01')),
   mail('noreply <noreply@beta-svc.com>', '[베타] 회원가입 완료', d('2025-02-01')),
@@ -68,7 +76,7 @@ const RAWS = [
   assert.strictEqual(cleanName('♟Chess.com'), 'Chess.com');
   assert.strictEqual(cleanName('Anthropic, PBC'), 'Anthropic');
   assert.strictEqual(cleanName('Notion Team'), 'Notion');
-  console.log(`[도메인] 18통 → ${groups.length}그룹 (개인 메일 2통 제외, 서브도메인 합침, 기관 3곳, 확인 필요 1곳)`);
+  console.log(`[도메인] 25통 → ${groups.length}그룹 (개인 메일 2통 제외, 서브도메인 합침, 기관 3곳, 확인 필요 1곳)`);
 
   // 규칙 모드: 같은 이름(Facebook) 합치기, noreply 는 안 합침
   const { items } = await classifyGroups(groups, { client: null, today: '2026-11-06' });
@@ -82,6 +90,10 @@ const RAWS = [
   assert.strictEqual(it('서울대학교').settings_url, null);
   assert.strictEqual(it('어딘가').risk, 'review');
   assert.strictEqual(items[items.length - 1].risk, 'review', '확인 필요는 맨 아래');
+  assert.strictEqual(it('Use AI').risk, 'high', '계정 삭제 예고 → 높음');
+  assert.strictEqual(g('kakaopaycorp.com').counts.order, 1, '거래확인증 → 이용 기록');
+  assert.notStrictEqual(it('카카오페이').risk, 'review', '거래확인증이 있으면 확인 필요 아님');
+  assert.strictEqual(g('helpful.example').counts.dormant, 0, '도움말 메일은 휴면 아님');
   // 서비스 알림(수신거부 링크만)은 광고와 구분 → 로그인 알림이 있으면 보통
   assert.strictEqual(g('facebookmail.com').counts.notice, 1);
   assert.strictEqual(it('Facebook').risk, 'medium', '알림 + 최근 로그인 → 보통');
