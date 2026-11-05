@@ -1,0 +1,8 @@
+{
+  "demo-shop.example": {
+    "service": "데모쇼핑",
+    "category": "쇼핑",
+    "settings_url": "http://localhost:3000/demo-shop/settings.html",
+    "contact_email": "privacy@demo-shop.example"
+  }
+}

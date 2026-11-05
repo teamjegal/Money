@@ -2,6 +2,8 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
+const { analyzeMailText } = require('./mbox');
+const { classifyGroups } = require('./llm');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,11 +17,23 @@ app.use(express.text({ limit: '20mb', type: ['text/*', 'application/mbox'] }));
 app.use('/demo-shop', express.static(path.join(ROOT, 'demo-shop')));
 app.use('/', express.static(path.join(ROOT, 'web')));
 
-// ---- API (지금은 더미 응답) ----
+// ---- API ----
 
-// 메일 분석 → 서비스 목록
-app.post('/api/analyze', (req, res) => {
-  res.json([]);
+// 메일 분석 → 서비스 목록 (위험도순 배열)
+// body: text/plain 원문, 또는 JSON { text: "..." }
+// 판단 방식은 응답 헤더 X-Analysis-Mode (llm | rules | rules-fallback | mixed)
+app.post('/api/analyze', async (req, res) => {
+  const text = typeof req.body === 'string' ? req.body : req.body?.text || req.body?.mbox || '';
+  if (!text.trim()) return res.status(400).json({ error: '메일 텍스트가 비어 있습니다.' });
+  try {
+    const { groups } = await analyzeMailText(text);
+    const result = await classifyGroups(groups);
+    res.set('X-Analysis-Mode', result.mode);
+    res.json(result.items);
+  } catch (e) {
+    console.error('[analyze] 실패:', e);
+    res.status(500).json({ error: '분석 중 오류가 발생했습니다.' });
+  }
 });
 
 // 설정 페이지 컨트롤 → 해제 대상
