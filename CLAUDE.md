@@ -60,7 +60,7 @@ consent-cleaner/
 ```json
 {
   "service": "데모쇼핑",
-  "domain": "demo-shop.local",
+  "domain": "demo-shop.example",
   "category": "쇼핑",
   "signals": ["가입 환영 메일", "광고 메일 12건", "휴면 전환 안내"],
   "marketing_consent": true,
