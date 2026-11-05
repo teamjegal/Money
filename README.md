@@ -41,7 +41,7 @@
 | --- | --- |
 | `optout_events` 테이블 | `install_id`, `method`(`080`/`link`), `ts`, `received_at`. RLS 켜짐 + 정책 없음 → **공개 키로 읽기·쓰기 불가** |
 | `POST /functions/v1/report` | 앱이 호출. 형식 검사(UUID, method, 최근 30일 시각) 후 저장. 세 필드 외에는 버림. 중복 무시 |
-| `GET /functions/v1/stats` | 통계 페이지가 호출. **집계값만** 반환 `{ total, users, avgPerUser, updatedAt }` |
+| `GET /functions/v1/stats` | 통계 페이지가 호출. **집계값만** 반환 `{ total, users, avgPerUser, method080, methodLink, today, lastHour, lastAt, hourly[24], updatedAt }` |
 
 기본 주소: `https://prqezaecwmfvjhfmqytf.supabase.co`
 
@@ -51,8 +51,14 @@
 
 `adsms/web/index.html` — 파일 하나짜리 정적 페이지. `main`에 푸시하면 GitHub Actions가 위 주소로 함께 배포한다.
 
-- 총 수신거부 건수 / 사용자 수(고유 설치 ID) / 1인당 평균 처리 건수
-- 30초마다 자동 새로고침, 한국 시간으로 마지막 갱신 시각 표시
+사이버 관제(HUD) 디자인. 모든 숫자는 실제 서버 집계값이다.
+
+- 지표 4개: 총 수신거부 건수 / 080 전화 거부(건수·점유율) / 링크 거부(건수·점유율) / 사용자 수·1인당 평균
+- 레이더: 새 수신거부가 들어오면 점이 찍힘 (080 초록, 링크 분홍)
+- 실시간 로그: 새로고침 사이에 늘어난 건수를 "080 전화로 수신거부 +N건"처럼 표시
+- 오늘(KST) / 최근 1시간 / 마지막 기록 시각
+- 차트: 080 vs 링크 비율 도넛, 0~23시(KST) 시간대별 누적 그래프
+- 30초마다 자동 새로고침, 응답 시간 표시, 신호음(기본 끔)
 
 로컬에서 볼 때:
 

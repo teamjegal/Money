@@ -5,7 +5,7 @@
 | 파일 | 내용 |
 | --- | --- |
 | `ADyson-v0.6-server.apk` | 안드로이드 앱 (v0.6, 서버 연결 버전) |
-| `web/index.html` | 수신거부 통계 페이지 (총 건수, 사용자 수, 1인당 평균, 30초 자동 새로고침) |
+| `web/index.html` | 수신거부 관제 페이지 (HUD 디자인: 지표 4개, 레이더, 실시간 로그, 방법 비율·시간대 차트, 30초 자동 새로고침) |
 
 ## 어떤 데이터가 서버로 가나
 
@@ -22,7 +22,7 @@
 | 엔드포인트 | 용도 |
 | --- | --- |
 | `POST https://prqezaecwmfvjhfmqytf.supabase.co/functions/v1/report` | 앱이 `{installId, method, ts}` 전송 → `optout_events` 테이블에 저장 |
-| `GET https://prqezaecwmfvjhfmqytf.supabase.co/functions/v1/stats` | 집계값만 반환 `{total, users, avgPerUser, updatedAt}` |
+| `GET https://prqezaecwmfvjhfmqytf.supabase.co/functions/v1/stats` | 집계값만 반환 `{total, users, avgPerUser, method080, methodLink, today, lastHour, lastAt, hourly[24], updatedAt}` |
 
 - `optout_events` 테이블은 공개 키로 읽기·쓰기가 막혀 있고, Edge Function만 접근합니다.
 - 통계 API는 숫자만 돌려주고 설치 ID나 개별 기록은 내보내지 않습니다.
