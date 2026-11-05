@@ -3,6 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { ANALYZE_SYSTEM, buildAnalyzeUser, RETRY_HINT } = require('./prompts');
 const KNOWN = require('./services.json');
 const { mergeByService } = require('./merge');
+const { guessHomepage } = require('./domains');
 
 const MODEL = process.env.MODEL || 'claude-sonnet-5-5';
 const BATCH = 20; // 도메인 그룹 20개씩 한 번에
@@ -140,7 +141,9 @@ function enforce(g, judged) {
 
 // 최종 서비스 항목 형식으로 합치기 (사실 정보는 메일에서, 판단은 LLM/규칙에서)
 function toServiceItem(g, judged) {
-  const known = KNOWN[g.domain] || {};
+  // 합쳐진 서비스면 도메인 중 하나라도 알려진 서비스인지
+  const known = KNOWN[g.domain] || (g.domains || []).map((d) => KNOWN[d]).find(Boolean) || {};
+  const inst = g.kind === 'institution';
   return {
     service: known.service || judged.service,
     domain: g.domain,
@@ -156,7 +159,9 @@ function toServiceItem(g, judged) {
     reason: judged.reason,
     unsubscribe: g.unsubscribe,
     unsubscribe_one_click: !!g.unsubscribe_one_click,
-    settings_url: g.kind === 'institution' ? null : known.settings_url || null,
+    settings_url: inst ? null : known.settings_url || null, // 자동 진행(데모쇼핑)
+    settings_page: inst ? null : known.settings_page || null, // 실제 사이트의 알림 설정 페이지 (팝업으로 해제)
+    homepage: inst ? null : known.homepage || guessHomepage(g.domains || [g.domain]),
     contact_email: known.contact_email || g.contact_email || null,
     mail_count: g.count,
     subjects: g.subjects,

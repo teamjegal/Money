@@ -5,42 +5,204 @@
     "settings_url": "http://localhost:3000/demo-shop/settings.html",
     "contact_email": "privacy@demo-shop.example"
   },
-  "facebook.com": { "service": "Facebook", "category": "SNS" },
-  "facebookmail.com": { "service": "Facebook", "category": "SNS" },
-  "instagram.com": { "service": "Instagram", "category": "SNS" },
-  "meta.com": { "service": "Meta", "category": "SNS" },
-  "linkedin.com": { "service": "LinkedIn", "category": "SNS" },
-  "pinterest.com": { "service": "Pinterest", "category": "SNS" },
-  "x.com": { "service": "X (Twitter)", "category": "SNS" },
-  "twitter.com": { "service": "X (Twitter)", "category": "SNS" },
-  "google.com": { "service": "Google", "category": "IT·업무" },
-  "youtube.com": { "service": "YouTube", "category": "영화" },
-  "microsoft.com": { "service": "Microsoft", "category": "IT·업무" },
-  "apple.com": { "service": "Apple", "category": "IT·업무" },
-  "github.com": { "service": "GitHub", "category": "IT·업무" },
-  "slack.com": { "service": "Slack", "category": "IT·업무" },
-  "slackhq.com": { "service": "Slack", "category": "IT·업무" },
-  "notion.so": { "service": "Notion", "category": "IT·업무" },
-  "notion.com": { "service": "Notion", "category": "IT·업무" },
-  "makenotion.com": { "service": "Notion", "category": "IT·업무" },
-  "openai.com": { "service": "ChatGPT", "category": "IT·업무" },
-  "claude.com": { "service": "Claude", "category": "IT·업무" },
-  "anthropic.com": { "service": "Claude", "category": "IT·업무" },
-  "canva.com": { "service": "Canva", "category": "IT·업무" },
-  "figma.com": { "service": "Figma", "category": "IT·업무" },
-  "supabase.com": { "service": "Supabase", "category": "IT·업무" },
-  "smartthings.com": { "service": "SmartThings", "category": "IT·업무" },
-  "netflix.com": { "service": "Netflix", "category": "영화" },
-  "tving.com": { "service": "TVING", "category": "영화" },
-  "spotv.net": { "service": "SPOTV NOW", "category": "영화" },
-  "nexon.com": { "service": "넥슨", "category": "게임" },
-  "epicgames.com": { "service": "Epic Games", "category": "게임" },
-  "steampowered.com": { "service": "Steam", "category": "게임" },
-  "chess.com": { "service": "Chess.com", "category": "게임" },
-  "kakaopaycorp.com": { "service": "카카오페이", "category": "금융" },
-  "kakaopay.com": { "service": "카카오페이", "category": "금융" },
-  "toss.im": { "service": "토스", "category": "금융" },
-  "woowahan.com": { "service": "배달의민족", "category": "배달" },
-  "baemin.com": { "service": "배달의민족", "category": "배달" },
-  "coupang.com": { "service": "쿠팡", "category": "쇼핑" }
+  "facebook.com": {
+    "service": "Facebook",
+    "category": "SNS",
+    "homepage": "https://www.facebook.com/",
+    "settings_page": "https://www.facebook.com/settings/?tab=notifications"
+  },
+  "facebookmail.com": {
+    "service": "Facebook",
+    "category": "SNS",
+    "homepage": "https://www.facebook.com/",
+    "settings_page": "https://www.facebook.com/settings/?tab=notifications"
+  },
+  "instagram.com": {
+    "service": "Instagram",
+    "category": "SNS",
+    "homepage": "https://www.instagram.com/"
+  },
+  "meta.com": {
+    "service": "Meta",
+    "category": "SNS",
+    "homepage": "https://accountscenter.meta.com/"
+  },
+  "linkedin.com": {
+    "service": "LinkedIn",
+    "category": "SNS",
+    "homepage": "https://www.linkedin.com/",
+    "settings_page": "https://www.linkedin.com/mypreferences/d/categories/notifications"
+  },
+  "pinterest.com": {
+    "service": "Pinterest",
+    "category": "SNS",
+    "homepage": "https://www.pinterest.com/",
+    "settings_page": "https://www.pinterest.com/settings/notifications"
+  },
+  "x.com": {
+    "service": "X (Twitter)",
+    "category": "SNS",
+    "homepage": "https://x.com/",
+    "settings_page": "https://x.com/settings/notifications"
+  },
+  "twitter.com": {
+    "service": "X (Twitter)",
+    "category": "SNS",
+    "homepage": "https://x.com/",
+    "settings_page": "https://x.com/settings/notifications"
+  },
+  "google.com": {
+    "service": "Google",
+    "category": "IT·업무",
+    "homepage": "https://myaccount.google.com/"
+  },
+  "youtube.com": {
+    "service": "YouTube",
+    "category": "영화",
+    "homepage": "https://www.youtube.com/",
+    "settings_page": "https://www.youtube.com/account_notifications"
+  },
+  "microsoft.com": {
+    "service": "Microsoft",
+    "category": "IT·업무",
+    "homepage": "https://account.microsoft.com/"
+  },
+  "apple.com": {
+    "service": "Apple",
+    "category": "IT·업무",
+    "homepage": "https://account.apple.com/"
+  },
+  "github.com": {
+    "service": "GitHub",
+    "category": "IT·업무",
+    "homepage": "https://github.com/",
+    "settings_page": "https://github.com/settings/notifications"
+  },
+  "slack.com": {
+    "service": "Slack",
+    "category": "IT·업무",
+    "homepage": "https://slack.com/"
+  },
+  "slackhq.com": {
+    "service": "Slack",
+    "category": "IT·업무",
+    "homepage": "https://slack.com/"
+  },
+  "notion.so": {
+    "service": "Notion",
+    "category": "IT·업무",
+    "homepage": "https://www.notion.so/"
+  },
+  "notion.com": {
+    "service": "Notion",
+    "category": "IT·업무",
+    "homepage": "https://www.notion.so/"
+  },
+  "makenotion.com": {
+    "service": "Notion",
+    "category": "IT·업무",
+    "homepage": "https://www.notion.so/"
+  },
+  "openai.com": {
+    "service": "ChatGPT",
+    "category": "IT·업무",
+    "homepage": "https://chatgpt.com/"
+  },
+  "claude.com": {
+    "service": "Claude",
+    "category": "IT·업무",
+    "homepage": "https://claude.ai/"
+  },
+  "anthropic.com": {
+    "service": "Claude",
+    "category": "IT·업무",
+    "homepage": "https://claude.ai/"
+  },
+  "canva.com": {
+    "service": "Canva",
+    "category": "IT·업무",
+    "homepage": "https://www.canva.com/"
+  },
+  "figma.com": {
+    "service": "Figma",
+    "category": "IT·업무",
+    "homepage": "https://www.figma.com/"
+  },
+  "supabase.com": {
+    "service": "Supabase",
+    "category": "IT·업무",
+    "homepage": "https://supabase.com/dashboard"
+  },
+  "smartthings.com": {
+    "service": "SmartThings",
+    "category": "IT·업무",
+    "homepage": "https://www.smartthings.com/"
+  },
+  "netflix.com": {
+    "service": "Netflix",
+    "category": "영화",
+    "homepage": "https://www.netflix.com/",
+    "settings_page": "https://www.netflix.com/account"
+  },
+  "tving.com": {
+    "service": "TVING",
+    "category": "영화",
+    "homepage": "https://www.tving.com/"
+  },
+  "spotv.net": {
+    "service": "SPOTV NOW",
+    "category": "영화",
+    "homepage": "https://www.spotvnow.co.kr/"
+  },
+  "nexon.com": {
+    "service": "넥슨",
+    "category": "게임",
+    "homepage": "https://www.nexon.com/"
+  },
+  "epicgames.com": {
+    "service": "Epic Games",
+    "category": "게임",
+    "homepage": "https://www.epicgames.com/"
+  },
+  "steampowered.com": {
+    "service": "Steam",
+    "category": "게임",
+    "homepage": "https://store.steampowered.com/"
+  },
+  "chess.com": {
+    "service": "Chess.com",
+    "category": "게임",
+    "homepage": "https://www.chess.com/",
+    "settings_page": "https://www.chess.com/settings/notifications"
+  },
+  "kakaopaycorp.com": {
+    "service": "카카오페이",
+    "category": "금융",
+    "homepage": "https://www.kakaopay.com/"
+  },
+  "kakaopay.com": {
+    "service": "카카오페이",
+    "category": "금융",
+    "homepage": "https://www.kakaopay.com/"
+  },
+  "toss.im": {
+    "service": "토스",
+    "category": "금융",
+    "homepage": "https://toss.im/"
+  },
+  "woowahan.com": {
+    "service": "배달의민족",
+    "category": "배달",
+    "homepage": "https://www.baemin.com/"
+  },
+  "baemin.com": {
+    "service": "배달의민족",
+    "category": "배달",
+    "homepage": "https://www.baemin.com/"
+  },
+  "coupang.com": {
+    "service": "쿠팡",
+    "category": "쇼핑",
+    "homepage": "https://www.coupang.com/"
+  }
 }

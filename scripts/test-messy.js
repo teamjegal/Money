@@ -91,6 +91,15 @@ const RAWS = [
   assert.strictEqual(it('어딘가').risk, 'review');
   assert.strictEqual(items[items.length - 1].risk, 'review', '확인 필요는 맨 아래');
   assert.strictEqual(it('Use AI').risk, 'high', '계정 삭제 예고 → 높음');
+  // [AI로 해제] 가 열 주소: 알려진 서비스는 알림 설정 페이지, 메일 전용 도메인은 본 사이트, 기관은 없음
+  assert.strictEqual(it('Facebook').settings_page, 'https://www.facebook.com/settings/?tab=notifications');
+  assert.strictEqual(it('쿠팡').homepage, 'https://www.coupang.com/');
+  assert.strictEqual(it('어딘가').homepage, 'https://random-startup.io/');
+  assert.strictEqual(it('서울대학교').homepage, null);
+  const { guessHomepage } = require('../server/domains');
+  assert.strictEqual(guessHomepage(['examplemail.com']), 'https://example.com/');
+  assert.strictEqual(guessHomepage(['shopemail.com']), 'https://shopemail.com/', '짧은 이름은 떼지 않음');
+  assert.strictEqual(guessHomepage(['brandmail.com', 'brand.com']), 'https://brand.com/');
   assert.strictEqual(g('kakaopaycorp.com').counts.order, 1, '거래확인증 → 이용 기록');
   assert.notStrictEqual(it('카카오페이').risk, 'review', '거래확인증이 있으면 확인 필요 아님');
   assert.strictEqual(g('helpful.example').counts.dormant, 0, '도움말 메일은 휴면 아님');

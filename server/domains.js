@@ -53,4 +53,18 @@ function cleanName(raw) {
   return s || String(raw).trim();
 }
 
-module.exports = { baseDomain, isPersonal, isInstitution, GENERIC_NAMES, normName, cleanName, PERSONAL_DOMAINS };
+// 모르는 서비스의 홈페이지 추측: 메일 전용 도메인(facebookmail.com 등)보다 본 도메인을 고른다
+// "facebookmail.com" → facebook.com 처럼 끝의 mail/email 을 떼어 본다
+function guessHomepage(domains) {
+  const list = (domains || []).filter(Boolean);
+  if (!list.length) return null;
+  const strip = (d) => {
+    // "mail" 떼기(남는 이름 6자 이상) → 안 되면 "email" 떼기(5자 이상). 짧으면 그대로 (엉뚱한 사이트 방지)
+    const m = d.match(/^([a-z0-9-]{6,})(mail|mailer)\.([a-z.]+)$/) || d.match(/^([a-z0-9-]{5,})(email)\.([a-z.]+)$/);
+    return m ? `${m[1]}.${m[3]}` : d;
+  };
+  const plain = list.filter((d) => !/mail/.test(d.split('.')[0])).sort((a, b) => a.length - b.length)[0] || strip(list[0]);
+  return `https://${plain}/`;
+}
+
+module.exports = { baseDomain, isPersonal, isInstitution, GENERIC_NAMES, normName, cleanName, guessHomepage, PERSONAL_DOMAINS };

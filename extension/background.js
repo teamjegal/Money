@@ -35,8 +35,11 @@ async function handleRevoke(payload, webTabId) {
 async function handleGuide(payload) {
   const domain = String((payload && payload.domain) || '').toLowerCase();
   if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) return { status: 'error', error: '서비스 도메인이 올바르지 않아요.' };
-  const tab = await chrome.tabs.create({ url: `https://${domain}/`, active: true });
-  await chrome.storage.session.set({ [`guide:${tab.id}`]: { service: payload.service || domain, domain } });
+  // 알림 설정 페이지나 본 홈페이지 (https만). 없으면 도메인 첫 페이지
+  let url = `https://${domain}/`;
+  try { if (payload.url && new URL(payload.url).protocol === 'https:') url = payload.url; } catch { /* 기본값 사용 */ }
+  const tab = await chrome.tabs.create({ url, active: true });
+  await chrome.storage.session.set({ [`guide:${tab.id}`]: { service: payload.service || domain, domain, settings: !!payload.settings } });
   chrome.action.setBadgeText({ tabId: tab.id, text: '?' }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#2156d9' }).catch(() => {});
   chrome.action.setTitle({ tabId: tab.id, title: `동의 클리너: ${payload.service || domain} 알림 설정 페이지에서 눌러주세요` }).catch(() => {});

@@ -10,7 +10,9 @@
   const ctx = (await chrome.storage.session.get(key))[key];
   if (ctx) {
     $('guide').hidden = false;
-    $('guide').textContent = `${ctx.service}: 로그인 후 마이페이지 > 알림(수신) 설정으로 이동한 다음 아래 버튼을 눌러주세요.`;
+    $('guide').textContent = ctx.settings
+      ? `${ctx.service}: 로그인한 뒤 알림 설정 화면이 보이면 아래 버튼을 눌러주세요.`
+      : `${ctx.service}: 로그인 후 마이페이지 > 알림(수신) 설정으로 이동한 다음 아래 버튼을 눌러주세요.`;
   }
 
   const show = (text, kind = '') => { $('msg').className = `msg ${kind}`; $('msg').textContent = text; };

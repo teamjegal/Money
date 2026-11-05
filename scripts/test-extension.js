@@ -200,8 +200,12 @@ function loadBridge(reply) {
   assert.strictEqual(rg.status, 'guided');
   assert.deepStrictEqual(gd.created, ['https://coupang.com/']);
   assert.strictEqual(gd.badges[0].text, '?');
-  assert.deepStrictEqual(plain(gd.session['guide:1']), { service: '쿠팡', domain: 'coupang.com' });
+  assert.deepStrictEqual(plain(gd.session['guide:1']), { service: '쿠팡', domain: 'coupang.com', settings: false });
   assert.strictEqual((await gd.send({ type: 'GUIDE', payload: { domain: 'javascript:alert(1)' } })).status, 'error');
+  await gd.send({ type: 'GUIDE', payload: { service: 'Facebook', domain: 'facebookmail.com', url: 'https://www.facebook.com/settings/?tab=notifications', settings: true } });
+  assert.strictEqual(gd.created[1], 'https://www.facebook.com/settings/?tab=notifications', '알림 설정 페이지로 바로');
+  await gd.send({ type: 'GUIDE', payload: { domain: 'x.example', url: 'javascript:alert(1)' } });
+  assert.strictEqual(gd.created[2], 'https://x.example/', 'https 아닌 주소는 무시');
   console.log('[10] GUIDE → https://coupang.com/ 새 탭, 아이콘 "?", 팝업 안내 저장 / 이상한 도메인 거절');
 
   // 11) REVOKE 흐름에서도 대상이 없으면 페이지 안내 배너

@@ -82,11 +82,15 @@ window.CCRevoke = (() => {
 
   // 설정 페이지 주소를 모르는 실제 서비스: 홈페이지를 열고 안내 (해제는 사용자가 그 사이트에서 팝업으로)
   const GUIDE_TEXT = '로그인 후 마이페이지 > 알림 설정으로 이동한 다음, 확장 아이콘의 \'이 페이지에서 광고 동의 찾기\'를 눌러주세요';
+  const GUIDE_SETTINGS = '로그인하면 알림 설정 페이지가 열려 있어요. 확장 아이콘의 \'이 페이지에서 광고 동의 찾기\'를 눌러주세요';
   async function guide(item) {
     const { setStatus } = window.CCApp;
-    setStatus(`${item.service}: ${GUIDE_TEXT}`);
-    toast(`<b>${esc(item.service)}</b> 홈페이지를 새 탭으로 열어요.<br>${esc(GUIDE_TEXT)}<br><small>처리 결과는 이 체크리스트에 자동으로 ✅ 표시돼요.</small>`, 'info', 12000);
-    const r = await CCExt.request('GUIDE', { service: item.service, domain: item.domain }, 20000);
+    // 알려진 서비스는 알림 설정 페이지, 아니면 홈페이지 (메일 전용 도메인 대신 본 사이트)
+    const url = item.settings_page || item.homepage || `https://${item.domain}/`;
+    const text = item.settings_page ? GUIDE_SETTINGS : GUIDE_TEXT;
+    setStatus(`${item.service}: ${text}`);
+    toast(`<b>${esc(item.service)}</b> ${item.settings_page ? '알림 설정 페이지' : '홈페이지'}를 새 탭으로 열어요.<br>${esc(text)}<br><small>처리 결과는 이 체크리스트에 자동으로 ✅ 표시돼요.</small>`, 'info', 12000);
+    const r = await CCExt.request('GUIDE', { service: item.service, domain: item.domain, url, settings: !!item.settings_page }, 20000);
     if (r.status !== 'guided') setStatus(`홈페이지를 열지 못했어요: ${r.error || '알 수 없는 오류'}`, 'error');
   }
 
