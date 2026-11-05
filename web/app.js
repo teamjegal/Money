@@ -69,17 +69,29 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '분석에 실패했어요.');
-      items = data;
-      mode = res.headers.get('X-Analysis-Mode') || '';
-      store.set(KEY_RESULT, { items, mode, at: Date.now() });
-      setStatus(items.length ? `${items.length}곳을 찾았어요.` : '가입처를 찾지 못했어요. 메일 형식을 확인해 주세요.');
-      render();
-      if (items.length) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      applyResult(data, res.headers.get('X-Analysis-Mode') || '');
     } catch (e) {
       setStatus(e.message === 'Failed to fetch' ? '서버에 연결할 수 없어요. npm start 상태를 확인해 주세요.' : e.message, 'error');
     } finally {
       setBusy(false);
     }
+  }
+
+  // 분석 결과 반영 (.mbox·Gmail 공용)
+  function applyResult(list, how, emptyMsg = '가입처를 찾지 못했어요. 메일 형식을 확인해 주세요.') {
+    items = list;
+    mode = how;
+    store.set(KEY_RESULT, { items, mode, at: Date.now() });
+    setStatus(items.length ? `${items.length}곳을 찾았어요.` : emptyMsg);
+    render();
+    if (items.length) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // 결과·체크 상태 모두 지우기 (Gmail 연결 끊기)
+  function clearResult() {
+    items = []; done = {};
+    store.remove(KEY_RESULT); store.remove(KEY_DONE);
+    render();
   }
 
   $('analyze').addEventListener('click', async () => {
@@ -199,7 +211,7 @@
   }
 
   // 확장 연동(revoke.js)에서 쓰는 함수들
-  window.CCApp = { setDone, setStatus, esc };
+  window.CCApp = { setDone, setStatus, esc, applyResult, clearResult, setBusy };
   const revokeWithExtension = (item, btn) => window.CCRevoke.run(item, btn);
 
   // ---- 시작: 지난 결과 복원 ----

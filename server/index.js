@@ -5,6 +5,7 @@ const express = require('express');
 const { analyzeMailText } = require('./mbox');
 const { classifyGroups } = require('./llm');
 const { pickTargets } = require('./pick');
+const gmail = require('./gmail');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,9 @@ app.use(express.text({ limit: '20mb', type: ['text/*', 'application/mbox'] }));
 app.use('/demo-shop', express.static(path.join(ROOT, 'demo-shop')));
 app.use('/samples', express.static(path.join(ROOT, 'samples'))); // [샘플 메일함으로 해보기] 용
 app.use('/', express.static(path.join(ROOT, 'web')));
+
+// ---- Gmail 연결: /auth/google, /oauth2callback, /api/gmail/*, /api/analyze-gmail ----
+app.use(gmail.router);
 
 // ---- API ----
 
@@ -62,6 +66,9 @@ app.post('/api/deletion-email', (req, res) => {
 app.listen(PORT, () => {
   console.log(`동의 클리너 서버 실행 중: http://localhost:${PORT}`);
   console.log(`데모 쇼핑몰: http://localhost:${PORT}/demo-shop/`);
+  console.log(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? 'Gmail 연결 준비됨 (읽기 전용)'
+    : 'GOOGLE_CLIENT_ID/SECRET 없음 → [Gmail로 분석하기] 비활성, .mbox 업로드만 가능');
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log('ANTHROPIC_API_KEY 없음 → 키워드 규칙 기반 대체 로직으로 동작합니다.');
   }

@@ -116,6 +116,7 @@ function toServiceItem(g, judged) {
     risk: judged.risk,
     reason: judged.reason,
     unsubscribe: g.unsubscribe,
+    unsubscribe_one_click: !!g.unsubscribe_one_click,
     settings_url: known.settings_url || null,
     contact_email: known.contact_email || g.contact_email || null,
     mail_count: g.count,

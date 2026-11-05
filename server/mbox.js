@@ -93,12 +93,15 @@ async function parseOne(raw) {
   if (!addr) return null;
   const subject = parsed.subject || '';
   const contact = text.match(/(privacy|dpo|personal)[\w.-]*@[\w.-]+\.\w+/i);
+  // mailparser는 List-Unsubscribe-Post를 headers.get('list')['unsubscribe-post'] 에 넣는다
+  const post = (parsed.headers.get('list') || {})['unsubscribe-post'];
   return {
     from: addr.address.toLowerCase(),
     fromName: addr.name || '',
     subject,
     date: parsed.date && !isNaN(parsed.date) ? parsed.date : null,
     unsubscribe: pickUnsubscribe(parsed),
+    oneClick: /one-click/i.test(typeof post === 'string' ? post : JSON.stringify(post || '')), // RFC 8058 원클릭 수신거부
     snippet: text.slice(0, 500),
     contactEmail: contact ? contact[0].toLowerCase() : null,
     type: classify(subject, text),
@@ -106,8 +109,13 @@ async function parseOne(raw) {
 }
 
 async function parseMessages(text) {
+  return parseRawMessages(splitMessages(text));
+}
+
+// 메일 원문(또는 Gmail에서 받은 헤더만 있는 원문) 배열 파싱
+async function parseRawMessages(raws) {
   const out = [];
-  for (const raw of splitMessages(text)) {
+  for (const raw of raws) {
     try {
       const mail = await parseOne(raw);
       if (mail) out.push(mail);
@@ -126,10 +134,15 @@ function baseDomain(domain) {
   return parts.slice(-n).join('.');
 }
 
+// 개인 메일 서비스 도메인: 친구·동료가 보낸 메일이라 "가입한 서비스"가 아니다
+const PERSONAL_DOMAINS = new Set(['gmail.com', 'googlemail.com', 'naver.com', 'daum.net', 'hanmail.net', 'kakao.com',
+  'nate.com', 'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com']);
+
 function groupByDomain(mails) {
   const groups = new Map();
   for (const m of mails) {
     const domain = baseDomain(m.from.split('@')[1] || '');
+    if (!domain || PERSONAL_DOMAINS.has(domain)) continue;
     if (!groups.has(domain)) groups.set(domain, { domain, mails: [] });
     groups.get(domain).mails.push(m);
   }
@@ -162,6 +175,7 @@ function summarize({ domain, mails }) {
     last_seen: dated.length ? toDateStr(dated[0].date) : null,
     subjects,
     unsubscribe: sorted.find((m) => m.unsubscribe)?.unsubscribe || null,
+    unsubscribe_one_click: !!sorted.find((m) => m.unsubscribe)?.oneClick,
     contact_email: sorted.find((m) => m.contactEmail)?.contactEmail || null,
     counts,
     last_ad: lastByType.ad || null,
@@ -178,4 +192,4 @@ async function analyzeMailText(text) {
   return { total: mails.length, groups: groupByDomain(mails) };
 }
 
-module.exports = { analyzeMailText, parseMessages, groupByDomain, splitMessages, baseDomain, classify };
+module.exports = { analyzeMailText, parseMessages, parseRawMessages, groupByDomain, splitMessages, baseDomain, classify };

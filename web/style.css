@@ -58,6 +58,19 @@ button { font: inherit; }
 .input-card h2, .list-head h2 { font-size: 17px; margin-bottom: 4px; }
 .input-card .muted { font-size: 13px; margin-bottom: 16px; }
 
+.gmail-box { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fafbfd; }
+.gmail-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn.big { padding: 13px 22px; font-size: 16px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; }
+.g-icon { font-size: 18px; }
+.gmail-info { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.gmail-info #gmail-state { word-break: break-all; }
+.gmail-info #gmail-state.on { color: var(--low); font-weight: 600; }
+.gmail-progress { margin-top: 14px; }
+.gmail-progress .progress-head { margin-bottom: 6px; }
+details.other { margin-top: 14px; }
+details.other summary { cursor: pointer; font-size: 14px; color: var(--muted); font-weight: 600; padding: 6px 0; list-style-position: inside; }
+details.other[open] summary { margin-bottom: 10px; }
+p.status { margin: 12px 0 0; min-height: 1em; }
 .input-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
 .drop {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
