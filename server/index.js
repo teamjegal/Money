@@ -15,6 +15,7 @@ app.use(express.text({ limit: '20mb', type: ['text/*', 'application/mbox'] }));
 
 // 정적 파일
 app.use('/demo-shop', express.static(path.join(ROOT, 'demo-shop')));
+app.use('/samples', express.static(path.join(ROOT, 'samples'))); // [샘플 메일함으로 해보기] 용
 app.use('/', express.static(path.join(ROOT, 'web')));
 
 // ---- API ----

@@ -1,0 +1,164 @@
+/* 동의 클리너 — 체크리스트 화면 */
+:root {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --text: #1b2430;
+  --muted: #637083;
+  --line: #e3e8ef;
+  --primary: #2156d9;
+  --primary-dark: #1a46b3;
+  --primary-soft: #eaf0fd;
+  --high: #d63a3a;
+  --high-soft: #fdecec;
+  --mid: #b86b00;
+  --mid-soft: #fff4e0;
+  --low: #1f8a4c;
+  --low-soft: #e6f5ec;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(20, 30, 50, .05), 0 4px 16px rgba(20, 30, 50, .05);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, p { margin: 0; }
+button { font: inherit; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* 헤더 */
+.top { background: var(--card); border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.top .wrap { padding-top: 16px; padding-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--primary); color: #fff; font-weight: 800; font-size: 20px;
+}
+.brand h1 { font-size: 18px; letter-spacing: -.01em; }
+.brand p { font-size: 13px; color: var(--muted); }
+
+/* 카드 */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+.input-card h2, .list-head h2 { font-size: 17px; margin-bottom: 4px; }
+.input-card .muted { font-size: 13px; margin-bottom: 16px; }
+
+.input-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+.drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 140px; padding: 16px; text-align: center; cursor: pointer;
+  border: 1.5px dashed #b8c3d4; border-radius: 12px; background: #fafbfd; color: var(--muted);
+  transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--primary); background: var(--primary-soft); }
+.drop.has-file { border-style: solid; border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
+.drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.drop:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.drop-icon { font-size: 26px; }
+.drop-text { font-size: 14px; word-break: break-all; }
+.drop-text b { color: var(--text); }
+textarea {
+  width: 100%; height: 140px; resize: vertical; padding: 12px;
+  border: 1px solid var(--line); border-radius: 12px; background: #fafbfd;
+  font: 13px/1.5 ui-monospace, Consolas, "Malgun Gothic", monospace; color: var(--text);
+}
+textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; background: #fff; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.status { font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.status.error { color: var(--high); }
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--primary); animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 버튼 */
+.btn {
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px;
+  transition: background .15s, border-color .15s, transform .05s; white-space: nowrap;
+}
+.btn:hover { background: #f1f4f8; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.primary:hover { background: var(--primary-dark); }
+.btn.ghost { background: transparent; }
+.btn.link { border: none; background: none; color: var(--muted); text-decoration: underline; padding: 6px; }
+.btn.sm { padding: 6px 11px; font-size: 13px; border-radius: 8px; }
+.btn.ai { background: var(--primary-soft); border-color: #c9d7f8; color: var(--primary); }
+.btn.ai:hover { background: #dce6fb; }
+
+/* 요약 */
+#result { margin-top: 24px; }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
+.stat .num { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.stat .num::after { content: "곳"; font-size: 15px; font-weight: 600; margin-left: 2px; color: var(--muted); }
+.stat .label { font-size: 13px; color: var(--muted); }
+.stat.danger .num { color: var(--high); }
+
+/* 진행률 */
+.progress-card { padding: 16px 20px; }
+.progress-head { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: var(--muted); }
+.progress-head b { color: var(--text); }
+.bar { height: 10px; background: #edf1f6; border-radius: 99px; overflow: hidden; }
+.fill { height: 100%; width: 0; background: linear-gradient(90deg, #2f6bf0, #22a06b); border-radius: 99px; transition: width .4s ease; }
+
+/* 체크리스트 */
+.list-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 24px 0 10px; flex-wrap: wrap; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); transition: border-color .15s; }
+.item:hover { border-color: #cdd6e3; }
+.item.done { background: #fbfcfd; }
+.item.done .name { color: var(--muted); text-decoration: line-through; text-decoration-color: #aab4c2; }
+
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+.check { width: 20px; height: 20px; accent-color: var(--low); cursor: pointer; flex-shrink: 0; margin: 0; }
+.main { flex: 1; min-width: 0; }
+.title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.name { font-weight: 700; font-size: 15px; }
+.meta { font-size: 13px; color: var(--muted); }
+.badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.badge.high { background: var(--high-soft); color: var(--high); }
+.badge.medium { background: var(--mid-soft); color: var(--mid); }
+.badge.low { background: var(--low-soft); color: var(--low); }
+.done-tag { font-size: 12px; color: var(--low); font-weight: 700; }
+.buttons { display: flex; gap: 6px; flex-shrink: 0; }
+.chev { width: 28px; height: 28px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; flex-shrink: 0; transition: transform .2s; }
+.chev:hover { background: #f1f4f8; }
+.item.open .chev { transform: rotate(180deg); }
+
+.detail { display: none; padding: 0 14px 14px 46px; }
+.item.open .detail { display: block; }
+.detail h3 { font-size: 12px; color: var(--muted); margin: 10px 0 6px; font-weight: 600; }
+.reason { background: var(--primary-soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.reason .by { font-size: 12px; color: var(--primary); font-weight: 700; margin-right: 6px; }
+.signals { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.signals li { font-size: 13px; background: #f1f4f8; border-radius: 8px; padding: 3px 9px; }
+.facts { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+.foot { text-align: center; margin: 20px 0 40px; }
+
+/* 모바일 */
+@media (max-width: 640px) {
+  .input-grid { grid-template-columns: 1fr; }
+  .drop { min-height: 96px; }
+  .summary { gap: 8px; }
+  .stat { padding: 12px; }
+  .stat .num { font-size: 24px; }
+  .row { flex-wrap: wrap; gap: 10px; }
+  .main { flex-basis: calc(100% - 80px); }
+  .buttons { order: 3; width: 100%; padding-left: 32px; flex-wrap: wrap; }
+  .detail { padding-left: 14px; }
+}

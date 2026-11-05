@@ -4,9 +4,76 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>동의 클리너</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body style="font-family: system-ui, sans-serif; text-align: center; padding: 4rem 1rem;">
-  <h1>동의 클리너</h1>
-  <p>메일로 찾는 개인정보 대청소 — 준비 중입니다.</p>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">✓</span>
+        <div>
+          <h1>동의 클리너</h1>
+          <p>메일로 찾는 개인정보 대청소</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- 입력 -->
+    <section class="card input-card" aria-labelledby="input-title">
+      <h2 id="input-title">메일함 불러오기</h2>
+      <p class="muted">메일 내용은 분석에만 쓰이고 서버에 저장되지 않아요. 비밀번호는 절대 묻지 않습니다.</p>
+
+      <div class="input-grid">
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept=".mbox,.eml,.txt,text/plain">
+          <span class="drop-icon" aria-hidden="true">📥</span>
+          <span class="drop-text" id="file-label"><b>.mbox 파일 선택</b><br>또는 여기로 끌어다 놓기</span>
+        </label>
+        <div class="paste">
+          <label for="paste" class="sr-only">메일 붙여넣기</label>
+          <textarea id="paste" placeholder="또는 메일 내용을 붙여넣기&#10;&#10;보낸사람: 데모쇼핑 &lt;ad@demo-shop.example&gt;&#10;제목: (광고) 가을 맞이 할인&#10;&#10;본문..."></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="analyze">분석하기</button>
+        <button class="btn ghost" id="sample">샘플 메일함으로 해보기</button>
+        <span class="status" id="status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <!-- 결과 -->
+    <section id="result" hidden>
+      <div class="summary">
+        <div class="stat"><span class="num" id="s-total">0</span><span class="label">가입처</span></div>
+        <div class="stat"><span class="num" id="s-ads">0</span><span class="label">광고 수신 중</span></div>
+        <div class="stat danger"><span class="num" id="s-high">0</span><span class="label">위험도 높음</span></div>
+      </div>
+
+      <div class="card progress-card">
+        <div class="progress-head">
+          <span>정리 진행률</span>
+          <span><b id="p-done">0</b> / <span id="p-total">0</span> 완료</span>
+        </div>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
+          <div class="fill" id="fill"></div>
+        </div>
+      </div>
+
+      <div class="list-head">
+        <h2>내 가입처 체크리스트</h2>
+        <span class="muted small" id="mode"></span>
+      </div>
+      <ul class="list" id="list"></ul>
+
+      <div class="foot">
+        <button class="btn link" id="reset">결과 지우기</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
