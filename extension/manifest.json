@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "동의 클리너",
+  "version": "0.1.0",
+  "description": "광고·마케팅 수신 동의 해제를 도와주는 확장 프로그램 (사용자 승인 후에만 클릭)",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*"],
+      "exclude_matches": ["http://localhost:3000/demo-shop/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

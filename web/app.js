@@ -179,7 +179,7 @@
     const act = e.target.closest('[data-act]')?.dataset.act;
 
     if (act === 'check') return setDone(item.domain, e.target.checked);
-    if (act === 'ai') return alert('확장 프로그램 연결 예정');
+    if (act === 'ai') return revokeWithExtension(item, e.target.closest('button'));
     if (act === 'unsub') return unsubscribe(item);
     if (act === 'delete') return alert('삭제 요청 메일 기능은 준비 중이에요.');
     if (act === 'toggle') {
@@ -196,6 +196,42 @@
     setTimeout(() => {
       if (confirm(`${item.service} 수신거부를 마쳤나요?\n확인을 누르면 처리 완료로 표시해요.`)) setDone(item.domain, true);
     }, 300);
+  }
+
+  // ---- 확장 프로그램 연결 ----
+  function renderExtStatus(state) {
+    const pill = $('ext-status');
+    pill.className = 'ext-pill ' + state;
+    pill.textContent = { on: '확장 프로그램 연결됨', off: '확장 프로그램 미설치', checking: '확장 프로그램 확인 중…' }[state];
+    $('ext-help').hidden = state !== 'off';
+  }
+  CCExt.onChange((on) => renderExtStatus(on ? 'on' : 'off'));
+  // READY가 1.5초 안에 안 오면 설치 안내
+  setTimeout(() => { if (!CCExt.connected) renderExtStatus('off'); }, 1500);
+
+  async function revokeWithExtension(item, btn) {
+    if (!CCExt.connected) {
+      $('ext-help').hidden = false;
+      $('ext-help').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '설정 페이지 여는 중…';
+    setStatus(`${item.service} 설정 페이지를 새 탭으로 여는 중이에요…`, 'loading');
+    const result = await CCExt.request('REVOKE', {
+      service: item.service, domain: item.domain, settings_url: item.settings_url,
+    });
+    btn.disabled = false;
+    btn.textContent = label;
+    if (result.status === 'opened') {
+      setStatus(`${item.service} 설정 페이지를 새 탭에서 열었어요.`);
+      // 목록을 보고 있으면 위쪽 상태 문구가 안 보이므로 버튼에도 잠깐 표시
+      btn.textContent = '새 탭에서 열림 ✓';
+      setTimeout(() => { btn.textContent = label; }, 3000);
+    } else {
+      setStatus(`AI 해제 실패: ${result.error || '알 수 없는 오류'}`, 'error');
+    }
   }
 
   // ---- 시작: 지난 결과 복원 ----
