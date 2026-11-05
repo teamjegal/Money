@@ -37,4 +37,20 @@ function isInstitution(domain, selfDomain) {
 const GENERIC_NAMES = /^(no-?reply|do-?not-?reply|noreply|support|help|info|news|newsletter|notification|notifications|notice|admin|team|service|mailer|hello|marketing|고객센터|알림|안내|공지|관리자|운영팀|뉴스레터)$/i;
 const normName = (s) => String(s || '').toLowerCase().replace(/[\s·.,_\-()[\]'"]/g, '').replace(/(코리아|korea|inc|corp|team|팀)$/g, '');
 
-module.exports = { baseDomain, isPersonal, isInstitution, GENERIC_NAMES, normName, PERSONAL_DOMAINS };
+// 발신자 이름 정리: "Andy from AhaSlides" → "AhaSlides", "♟Chess.com" → "Chess.com",
+// "Notion Team" → "Notion", "Anthropic, PBC" → "Anthropic", "SheerID Verification" → "SheerID"
+function cleanName(raw) {
+  if (!raw) return '';
+  let s = String(raw).replace(/["'“”‘’]/g, '');
+  s = s.replace(/[\p{Extended_Pictographic}☀-➿️‍]/gu, ' ');
+  s = s.replace(/^.{1,30}?\s+(from|at|@)\s+(?=\S)/i, ''); // "Andy from X"
+  s = s.replace(/^.{1,20}?\s*[|｜]\s*/, (m) => (m.length < s.length / 2 ? '' : m)); // "Andy | X"
+  for (let i = 0; i < 2; i++) {
+    s = s.replace(/[,\s]+(inc\.?|llc|ltd\.?|pbc|corp\.?|co\.,?\s*ltd\.?|gmbh|주식회사|\(주\))$/i, '');
+    s = s.replace(/\s+(team|팀|verification|notifications?|support|news|newsletter|alerts?|updates?|no-?reply)$/i, '');
+  }
+  s = s.replace(/^\(주\)\s*|^주식회사\s*|^the\s+/i, '').replace(/\s+/g, ' ').trim();
+  return s || String(raw).trim();
+}
+
+module.exports = { baseDomain, isPersonal, isInstitution, GENERIC_NAMES, normName, cleanName, PERSONAL_DOMAINS };

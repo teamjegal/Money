@@ -7,57 +7,74 @@ const { mergeByService } = require('./merge');
 const MODEL = process.env.MODEL || 'claude-sonnet-5-5';
 const BATCH = 20; // 도메인 그룹 20개씩 한 번에
 const RISK_ORDER = { high: 0, medium: 1, low: 2, review: 3 }; // review: 확인 필요 (낮은 우선순위)
-const CATEGORIES = ['쇼핑', '배달', '여행', '영화', '공연', '도서', '교육', '금융', '뉴스', '운동', '중고거래', '반려동물', '인테리어', 'SNS', '기관', '기타'];
+const CATEGORIES = ['쇼핑', '배달', '여행', '영화', '공연', '도서', '교육', '금융', '뉴스', '운동', '중고거래', '반려동물',
+  '인테리어', 'SNS', 'IT·업무', '게임', '기관', '기타'];
 
-// 카테고리 추정용 키워드 (이름 + 제목에서 찾음)
-const CATEGORY_HINTS = [
-  ['SNS', /facebook|instagram|twitter|linkedin|tiktok|discord|threads|pinterest|reddit|페이스북|인스타그램|카카오스토리/i],
-  ['영화', /netflix|youtube|disney|wavve|tving|watcha|coupang ?play|넷플릭스|유튜브|티빙|왓챠/i],
-  ['배달', /배달|배고파|음식|치킨/], ['여행', /여행|호텔|숙소|항공|호캉스/], ['영화', /영화|시네마|극장|팝콘/],
-  ['공연', /공연|뮤지컬|콘서트|티켓/], ['도서', /책|도서|서점|베스트셀러/], ['교육', /강의|수강|클래스|배움|자격증/],
-  ['금융', /가계부|은행|카드|머니|동전|금융/], ['뉴스', /뉴스|레터|소식/], ['운동', /운동|피트|핏|런|헬스/],
-  ['중고거래', /중고|장터|거래/], ['반려동물', /반려|멍|냥|사료|펫/], ['인테리어', /인테리어|홈스타일|가구|협탁|뜰/],
-  ['쇼핑', /쇼핑|마켓|마트|딜|할인|특가|주문/],
+// 카테고리 추정: 1) 서비스 이름·도메인으로 브랜드 판단 2) 안 되면 제목 키워드
+const BRAND_HINTS = [
+  ['IT·업무', /github|gitlab|slack|notion|openai|chatgpt|claude|anthropic|canva|figma|supabase|vercel|google|microsoft|apple|dropbox|zoom|atlassian|jira|smartthings|samsung|adobe|aws|use.?ai|ahaslides|sheerid/i],
+  ['게임', /nexon|넥슨|epic ?games|steam|riot|blizzard|nintendo|playstation|xbox|chess|넷마블|엔씨|krafton|크래프톤|스마일게이트|게임/i],
+  ['SNS', /facebook|instagram|twitter|linkedin|tiktok|discord|threads|pinterest|reddit|deviantart|meta|페이스북|인스타그램|카카오스토리/i],
+  ['영화', /netflix|youtube|disney|wavve|tving|watcha|spotv|coupang ?play|넷플릭스|유튜브|티빙|왓챠/i],
+  ['금융', /페이|pay(corp)?|toss|토스|bank|은행|카드|증권|보험|가계부/i],
+  ['배달', /배달|배민|woowahan|baemin|요기요|쿠팡이츠/i],
+  ['중고거래', /중고|당근|번개장터|daangn/i],
+];
+const SUBJECT_HINTS = [
+  ['여행', /여행|호텔|숙소|항공|호캉스/], ['영화', /영화|시네마|극장|팝콘/], ['공연', /공연|뮤지컬|콘서트|티켓/],
+  ['도서', /책|도서|서점|베스트셀러/], ['교육', /강의|수강|클래스|배움|자격증|course/i], ['금융', /머니|동전|금융/],
+  ['뉴스', /뉴스|레터|소식|newsletter/i], ['운동', /운동|피트|핏|런|헬스/], ['반려동물', /반려|멍|냥|사료|펫/],
+  ['인테리어', /인테리어|홈스타일|가구|협탁|뜰/], ['배달', /배달|배고파|음식|치킨/], ['쇼핑', /쇼핑|마켓|마트|딜|할인|특가|주문|shop|store/i],
 ];
 
 const toDate = (s) => (s ? new Date(s + 'T00:00:00+09:00') : null);
 const daysBetween = (a, b) => Math.floor((toDate(b) - toDate(a)) / 86400000);
 const todayStr = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+const latest = (...ds) => ds.filter(Boolean).sort().pop() || null;
 
 // ---- 규칙 기반 판단 (키 없음 / LLM 실패 시) ----
 function guessCategory(g) {
-  const hay = `${g.name} ${g.subjects.join(' ')}`;
-  return CATEGORY_HINTS.find(([, re]) => re.test(hay))?.[0] || '기타';
+  const who = `${g.name} ${(g.domains || [g.domain]).join(' ')}`;
+  return BRAND_HINTS.find(([, re]) => re.test(who))?.[0]
+    || SUBJECT_HINTS.find(([, re]) => re.test(`${g.name} ${g.subjects.join(' ')}`))?.[0] || '기타';
 }
 
+// 위험도: 광고·마케팅(할인·이벤트·"(광고)")과 서비스 알림(수신거부 링크만)을 구분한다.
+// 이용 신호 = 주문·결제, 로그인·보안 알림, 가입. 무료 서비스는 주문이 없으니 로그인 알림도 이용으로 본다.
 function ruleJudge(g, today) {
   const base = { domain: g.domain, service: g.name };
   // 학교·공공기관·내 회사: 해제 대상 아님
   if (g.kind === 'institution') {
     return { ...base, category: '기관', marketing_consent: false, risk: 'low', reason: '학교·공공기관·회사 메일이라 해제 대상이 아니에요' };
   }
-  const ads = g.counts.ad + (g.counts.promo || 0), sinceOrder = g.last_order ? daysBetween(g.last_order, today) : null;
-  const adWord = g.counts.ad ? '광고' : '마케팅·알림성 메일';
+  const marketing = g.counts.ad + (g.counts.promo || 0);
+  const notice = g.counts.notice || 0;
+  const lastUse = latest(g.last_order, g.last_security, g.last_signup);
+  const usedRecently = lastUse && daysBetween(lastUse, today) < 365;
+  const adWord = g.counts.ad ? '광고' : '마케팅 메일';
   let risk, reason;
   if (g.weak) {
     risk = 'review';
     reason = `메일 ${g.count}통뿐이고 가입·이용 신호가 없어 확인이 필요해요`;
   } else if (g.counts.dormant) {
     risk = 'high';
-    reason = `${g.last_dormant} 휴면 전환 안내를 받음` + (ads ? ` · 광고 ${ads}건` : '');
-  } else if (ads && (sinceOrder === null || sinceOrder >= 365)) {
+    reason = `${g.last_dormant} 휴면 전환 안내를 받음` + (marketing ? ` · ${adWord} ${marketing}건` : '');
+  } else if (marketing && !usedRecently) {
     risk = 'high';
-    reason = g.last_order
-      ? `${adWord}은 ${g.last_ad}까지 오는데 마지막 주문은 ${g.last_order}`
-      : `주문 기록 없이 ${adWord}만 ${ads}건 수신`;
-  } else if (ads) {
+    reason = lastUse
+      ? `${adWord}은 ${g.last_ad}까지 오는데 마지막 이용 신호는 ${lastUse}`
+      : `이용 기록 없이 ${adWord}만 ${marketing}건 수신`;
+  } else if (marketing) {
     risk = 'medium';
-    reason = `${adWord} 수신 중이고 ${g.last_order}에 주문 기록 있음`;
+    reason = `${adWord} ${marketing}건 수신 중, ${lastUse}에 이용 신호 있음`;
+  } else if (notice) {
+    risk = 'medium';
+    reason = `서비스 알림 메일 ${notice}건 수신 중 (마지막 ${g.last_notice}, 수신거부 가능)`;
   } else {
     risk = 'low';
-    reason = '광고 없이 정보성 메일만 수신';
+    reason = '광고·알림 없이 정보성 메일만 수신';
   }
-  return { ...base, category: guessCategory(g), marketing_consent: ads > 0, risk, reason };
+  return { ...base, category: guessCategory(g), marketing_consent: marketing + notice > 0, risk, reason };
 }
 
 // ---- LLM 응답 파싱 ----

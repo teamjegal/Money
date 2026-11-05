@@ -63,6 +63,11 @@ const RAWS = [
   assert.ok(g('random-startup.io').weak);
   // 회사 메일 주소면 그 회사 도메인은 기관
   assert.strictEqual(groupByDomain(await parseRawMessages(RAWS), { selfDomain: 'alpha-svc.com' }).find((x) => x.domain === 'alpha-svc.com').kind, 'institution');
+  const { cleanName } = require('../server/domains');
+  assert.strictEqual(cleanName('Andy from AhaSlides'), 'AhaSlides');
+  assert.strictEqual(cleanName('♟Chess.com'), 'Chess.com');
+  assert.strictEqual(cleanName('Anthropic, PBC'), 'Anthropic');
+  assert.strictEqual(cleanName('Notion Team'), 'Notion');
   console.log(`[도메인] 18통 → ${groups.length}그룹 (개인 메일 2통 제외, 서브도메인 합침, 기관 3곳, 확인 필요 1곳)`);
 
   // 규칙 모드: 같은 이름(Facebook) 합치기, noreply 는 안 합침
@@ -77,6 +82,12 @@ const RAWS = [
   assert.strictEqual(it('서울대학교').settings_url, null);
   assert.strictEqual(it('어딘가').risk, 'review');
   assert.strictEqual(items[items.length - 1].risk, 'review', '확인 필요는 맨 아래');
+  // 서비스 알림(수신거부 링크만)은 광고와 구분 → 로그인 알림이 있으면 보통
+  assert.strictEqual(g('facebookmail.com').counts.notice, 1);
+  assert.strictEqual(it('Facebook').risk, 'medium', '알림 + 최근 로그인 → 보통');
+  assert.strictEqual(it('Facebook').category, 'SNS');
+  assert.strictEqual(it('쿠팡').risk, 'high', '할인 메일은 오는데 1년 넘게 이용 없음 → 높음');
+  assert.strictEqual(it('Netflix').risk, 'medium', '마케팅 + 최근 결제 → 보통');
   console.table(items.map((x) => ({ 서비스: x.service, 도메인: x.domains.join(','), 분류: x.category, 메일: x.mail_count, 위험도: x.risk, 광고동의: x.marketing_consent ? 'O' : '-', 근거: x.reason })));
 
   // LLM 모드: 20개씩 배치, 제목 6개, LLM 서비스명으로 합치기, 기관은 코드가 강제

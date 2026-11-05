@@ -2,16 +2,18 @@
 // (예: facebookmail.com + facebook.com → Facebook). 키는 LLM이 정한 서비스명, 규칙 모드면 발신자 이름.
 const { GENERIC_NAMES, normName } = require('./domains');
 const { signalsOf } = require('./mbox');
+const KNOWN = require('./services.json');
 
 const RISK_RANK = { high: 3, medium: 2, low: 1, review: 0 };
 const ACCOUNT_SIGNALS = ['signup', 'privacy', 'order', 'dormant', 'security'];
 const maxStr = (a, b) => (!a ? b : !b ? a : a > b ? a : b);
 const minStr = (a, b) => (!a ? b : !b ? a : a < b ? a : b);
 
-// 묶음 키: 기관은 합치지 않음, 흔한 이름(noreply 등)도 합치지 않음
+// 묶음 키: 알려진 서비스(services.json) > LLM 서비스명 > 발신자 이름. 기관·흔한 이름은 합치지 않음
 function keyOf(group, judged) {
   if (group.kind === 'institution') return `d:${group.domain}`;
-  const name = judged.by === 'llm' ? judged.service : group.name;
+  const known = KNOWN[group.domain] && KNOWN[group.domain].service;
+  const name = known || (judged.by === 'llm' ? judged.service : group.name);
   const k = normName(name);
   if (!k || k.length < 2 || GENERIC_NAMES.test(String(name).trim())) return `d:${group.domain}`;
   return `s:${k}`;
@@ -31,6 +33,9 @@ function combine(a, b) {
     first_seen: minStr(a.first_seen, b.first_seen),
     last_seen: maxStr(a.last_seen, b.last_seen),
     last_ad: maxStr(a.last_ad, b.last_ad),
+    last_notice: maxStr(a.last_notice, b.last_notice),
+    last_security: maxStr(a.last_security, b.last_security),
+    last_signup: maxStr(a.last_signup, b.last_signup),
     last_order: maxStr(a.last_order, b.last_order),
     last_dormant: maxStr(a.last_dormant, b.last_dormant),
     subjects: [...new Set([...a.subjects, ...b.subjects])].slice(0, 8),

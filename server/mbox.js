@@ -1,6 +1,6 @@
 // .mbox 또는 붙여넣은 메일 텍스트 → 메일 목록 → 서비스(도메인)별 그룹
 const { simpleParser } = require('mailparser');
-const { baseDomain, isPersonal, isInstitution } = require('./domains');
+const { baseDomain, isPersonal, isInstitution, cleanName } = require('./domains');
 
 // mbox 구분줄: "From 보낸사람 요일 월 일 시:분:초 연도"
 const FROM_LINE = /^From \S+ +\w{3} \w{3} +\d{1,2} \d{2}:\d{2}(:\d{2})? \d{4}/;
@@ -18,7 +18,8 @@ const RULES = [
 
 const LABELS = {
   ad: (n) => `광고 메일 ${n}건`,
-  promo: (n) => `마케팅·알림성 메일 ${n}건`,
+  promo: (n) => `마케팅 메일 ${n}건`,
+  notice: (n) => `서비스 알림 메일 ${n}건 (수신거부 가능)`,
   signup: () => '가입 환영/인증 메일',
   privacy: () => '개인정보·약관 안내',
   dormant: () => '휴면 전환 안내',
@@ -80,8 +81,8 @@ const SUBJECT_ONLY = new Set(['ad', 'promo', 'security']);
 function classify(subject, body, hasUnsubscribe = false) {
   for (const r of RULES) if (r.re.test(subject)) return r.type;
   for (const r of RULES) if (!SUBJECT_ONLY.has(r.type) && r.re.test(body)) return r.type;
-  // 수신거부 링크(List-Unsubscribe)가 붙은 대량 발송 메일 = 마케팅·알림성
-  return hasUnsubscribe ? 'promo' : 'info';
+  // 할인·이벤트 단어 없이 수신거부 링크(List-Unsubscribe)만 있는 대량 발송 = 서비스 알림 (광고와 구분)
+  return hasUnsubscribe ? 'notice' : 'info';
 }
 
 // 메일 원문 하나 파싱
@@ -153,7 +154,7 @@ function summarize({ domain, mails }, selfDomain) {
   // 날짜 있는 것 먼저, 최신순
   const sorted = [...mails].sort((a, b) => (b.date || 0) - (a.date || 0));
   const dated = sorted.filter((m) => m.date);
-  const counts = { ad: 0, promo: 0, signup: 0, privacy: 0, dormant: 0, security: 0, order: 0, info: 0 };
+  const counts = { ad: 0, promo: 0, notice: 0, signup: 0, privacy: 0, dormant: 0, security: 0, order: 0, info: 0 };
   const lastByType = {};
   for (const m of sorted) {
     counts[m.type] = (counts[m.type] || 0) + 1;
@@ -162,7 +163,7 @@ function summarize({ domain, mails }, selfDomain) {
   // 표시 이름: 가장 많이 쓰인 발신자 이름
   const nameCount = {};
   for (const m of mails) if (m.fromName) nameCount[m.fromName] = (nameCount[m.fromName] || 0) + 1;
-  const name = Object.entries(nameCount).sort((a, b) => b[1] - a[1])[0]?.[0] || domain.split('.')[0];
+  const name = cleanName(Object.entries(nameCount).sort((a, b) => b[1] - a[1])[0]?.[0]) || domain.split('.')[0];
   const lastMarketing = [lastByType.ad, lastByType.promo].filter(Boolean).sort().pop() || null;
 
   return {
@@ -178,8 +179,11 @@ function summarize({ domain, mails }, selfDomain) {
     unsubscribe_one_click: !!sorted.find((m) => m.unsubscribe)?.oneClick,
     contact_email: sorted.find((m) => m.contactEmail)?.contactEmail || null,
     counts,
-    last_ad: lastMarketing, // 광고 + 마케팅·알림성 중 가장 최근
+    last_ad: lastMarketing, // 광고 + 마케팅 중 가장 최근 (서비스 알림 제외)
+    last_notice: lastByType.notice || null,
     last_order: lastByType.order || null,
+    last_security: lastByType.security || null,
+    last_signup: lastByType.signup || null,
     last_dormant: lastByType.dormant || null,
     // 1~2통뿐이고 가입·이용 신호가 없으면 "확인 필요" (진짜 가입했는지 불확실)
     weak: mails.length <= 2 && !ACCOUNT_SIGNALS.some((t) => counts[t]),
