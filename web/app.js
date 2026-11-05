@@ -144,7 +144,7 @@
     const isDone = !!done[x.domain];
     const buttons = isInst(x) ? '' : [
       x.settings_url ? `<button class="btn sm ai" data-act="ai">AI로 해제</button>` : '',
-      x.unsubscribe ? `<button class="btn sm" data-act="unsub">수신거부</button>` : '',
+      CCUnsub.label(x) ? `<button class="btn sm${CCUnsub.kindOf(x) === 'oneclick' ? ' unsub1' : ''}" data-act="unsub">${CCUnsub.label(x)}</button>` : '',
       `<button class="btn sm" data-act="delete">삭제 요청 메일</button>`,
     ].join('');
     const signals = (x.signals || []).map((s) => `<li>${esc(s)}</li>`).join('') || '<li>특별한 신호 없음</li>';
@@ -157,7 +157,7 @@
             <div class="title-line">
               <span class="name">${esc(x.service)}</span>
               ${isInst(x) ? '<span class="badge inst">기관</span>' : `<span class="badge ${esc(x.risk)}">${RISK_LABEL[x.risk] || esc(x.risk)}</span>`}
-              ${isDone ? '<span class="done-tag">✓ 완료</span>' : ''}
+              ${isDone ? `<span class="done-tag">✓ ${done[x.domain] === 'unsub' ? '수신거부 완료' : '완료'}</span>` : ''}
             </div>
             <div class="meta">${esc(x.category)} · 마지막 메일 ${esc(x.last_seen || '-')}</div>
           </div>
@@ -186,7 +186,7 @@
   }
 
   function setDone(domain, value) {
-    if (value) done[domain] = true; else delete done[domain];
+    if (value) done[domain] = value === 'unsub' ? 'unsub' : true; else delete done[domain]; // 'unsub' = 수신거부 완료
     store.set(KEY_DONE, done);
     render();
   }
@@ -208,23 +208,13 @@
 
     if (act === 'check') return setDone(item.domain, e.target.checked);
     if (act === 'ai') return revokeWithExtension(item, e.target.closest('button'));
-    if (act === 'unsub') return unsubscribe(item);
+    if (act === 'unsub') return CCUnsub.run(item, e.target.closest('button'));
     if (act === 'delete') return alert('삭제 요청 메일 기능은 준비 중이에요.');
     if (act === 'toggle') {
       const open = li.classList.toggle('open');
       li.querySelector('.chev').setAttribute('aria-expanded', open);
     }
   });
-
-  function unsubscribe(item) {
-    const url = item.unsubscribe;
-    if (!/^(https?:|mailto:)/i.test(url)) return alert('수신거부 링크가 올바르지 않아요.');
-    window.open(url, '_blank', 'noopener');
-    // 새 탭에서 돌아온 뒤 물어보기
-    setTimeout(() => {
-      if (confirm(`${item.service} 수신거부를 마쳤나요?\n확인을 누르면 처리 완료로 표시해요.`)) setDone(item.domain, true);
-    }, 300);
-  }
 
   // 확장 연동(revoke.js)에서 쓰는 함수들
   window.CCApp = { setDone, setStatus, esc, applyResult, clearResult, setBusy };

@@ -103,13 +103,18 @@ async function parseOne(raw) {
   const contact = text.match(/(privacy|dpo|personal)[\w.-]*@[\w.-]+\.\w+/i);
   // mailparser는 List-Unsubscribe-Post를 headers.get('list')['unsubscribe-post'] 에 넣는다
   const post = (parsed.headers.get('list') || {})['unsubscribe-post'];
+  const unsubscribe = pickUnsubscribe(parsed);
+  // RFC 8058 원클릭: List-Unsubscribe-Post 헤더 + List-Unsubscribe 헤더의 https 링크일 때만 (본문 링크는 절대 아님)
+  const headerUrls = [].concat(((parsed.headers.get('list') || {}).unsubscribe) || []).map((x) => x && x.url).filter(Boolean);
+  const oneClick = /one-click/i.test(typeof post === 'string' ? post : JSON.stringify(post || ''))
+    && /^https:\/\//i.test(unsubscribe || '') && headerUrls.includes(unsubscribe);
   return {
     from: addr.address.toLowerCase(),
     fromName: addr.name || '',
     subject,
     date: parsed.date && !isNaN(parsed.date) ? parsed.date : null,
-    unsubscribe: pickUnsubscribe(parsed),
-    oneClick: /one-click/i.test(typeof post === 'string' ? post : JSON.stringify(post || '')), // RFC 8058 원클릭 수신거부
+    unsubscribe,
+    oneClick,
     snippet: text.slice(0, 500),
     contactEmail: contact ? contact[0].toLowerCase() : null,
     // 헤더의 List-Unsubscribe만 대량 발송 신호로 본다 (본문 속 "수신거부" 링크는 제외)

@@ -5,6 +5,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const { parseRawMessages, groupByDomain } = require('./mbox');
 const { classifyGroups } = require('./llm');
+const unsub = require('./unsubscribe');
 
 const PORT = process.env.PORT || 3000;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2callback`;
@@ -125,6 +126,7 @@ async function runJob(job, gmail, opts = {}) {
     job.phase = 'classifying';
     const result = await classifyGroups(groups);
     if (job.cancelled) return;
+    unsub.register(result.items, 'gmail');
     Object.assign(job, { phase: 'done', mode: result.mode, items: result.items, mailCount: mails.length });
   } catch (e) {
     const s = +statusOf(e);
@@ -197,6 +199,7 @@ router.post('/api/gmail/disconnect', async (req, res) => {
   const tokens = mem.tokens;
   if (mem.job) mem.job.cancelled = true;
   Object.assign(mem, { tokens: null, email: null, oauthState: null, job: null });
+  unsub.clear('gmail');
   // 구글 쪽 권한도 철회 (실패해도 메모리는 이미 비움)
   if (tokens && tokens.access_token) {
     try { await oauthClient().revokeToken(tokens.access_token); } catch (e) { console.warn('[gmail] 토큰 철회 실패:', e.message); }

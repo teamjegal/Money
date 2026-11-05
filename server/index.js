@@ -6,6 +6,7 @@ const { analyzeMailText } = require('./mbox');
 const { classifyGroups } = require('./llm');
 const { pickTargets } = require('./pick');
 const gmail = require('./gmail');
+const unsub = require('./unsubscribe');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { groups } = await analyzeMailText(text);
     const result = await classifyGroups(groups);
+    unsub.register(result.items, 'mbox'); // 수신거부 URL은 메일 헤더에서 온 것만 서버 메모리에
     res.set('X-Analysis-Mode', result.mode);
     res.json(result.items);
   } catch (e) {
@@ -56,6 +58,15 @@ app.post('/api/pick-targets', async (req, res) => {
     console.error('[pick-targets] 실패:', e);
     res.status(500).json({ error: '해제 대상 선택 중 오류가 발생했습니다.' });
   }
+});
+
+// 원클릭 수신거부 (RFC 8058). body: { domain } — URL은 받지 않고 분석 결과(메일 헤더)에서 꺼낸다
+app.post('/api/unsubscribe', async (req, res) => {
+  const domain = req.body && typeof req.body.domain === 'string' ? req.body.domain : '';
+  if (!domain) return res.status(400).json({ ok: false, error: 'domain이 필요해요.' });
+  const r = await unsub.unsubscribeOneClick(domain);
+  console.log(`[unsubscribe] ${domain}: ${r.ok ? '성공 ' + r.status : '실패 ' + r.error}`);
+  res.status(r.ok ? 200 : 422).json(r);
 });
 
 // 개인정보 삭제 요청 메일 초안
