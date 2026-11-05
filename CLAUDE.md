@@ -46,11 +46,12 @@ Windows에서 경로에 한글이 있으면 `apksigner.bat`이 깨진다. `java 
 ## 통계 페이지
 
 - 배포 주소: https://teamjegal.github.io/Money/adsms/ — `.github/workflows/deploy.yml`의 "Add ADyson stats page" 단계가 `adsms/web/index.html`을 `dist/adsms/`로 복사한다. 파일을 추가하면 이 단계도 같이 고친다.
-- 정적 HTML 파일 하나. 빌드 도구 없이 유지한다. 외부 스크립트는 **버전을 고정한** Chart.js(`chart.js@4.4.7`)와 Lucide 아이콘(`lucide@0.468.0`), 글꼴은 Google Fonts(Orbitron, JetBrains Mono)만 쓴다. `@latest`처럼 버전 없는 주소는 쓰지 않는다.
+- 정적 HTML 파일 하나(스크립트 포함). 빌드 도구·외부 스크립트 없이 유지한다. 글꼴만 Google Fonts(Instrument Serif, Inter). 그래프는 CSS(막대 높이 `--h`, 비율 `--p`)로 그린다.
+- 디자인은 에디토리얼·스위스 스타일: 세리프 헤드라인, 굵은 구분선, 격자. 색은 종이색 배경 + 검정 + 빨강 하나.
+- 숫자는 `data-k="키"` 속성으로 채운다 (`total`, `users`, `avgPerUser`, `method080`, `methodLink`, `today`, `lastHour`, `share080`, `shareLink`, `lastAtText`, `peakHourText`, `updatedText`).
 - `fetch`는 `stats` 엔드포인트에만 쓴다. 다른 외부 API·분석 도구를 붙이지 않는다.
 - 화면의 모든 숫자는 실제 `stats` 값이어야 한다. 가짜(목업) 숫자, 문자 발신처·제목·내용, 지역·카테고리·금액처럼 서버에 없는 데이터는 넣지 않는다.
-- 실시간 로그는 새로고침 사이 집계값의 증가분(080 +N, 링크 +N, 새 사용자)으로 만든다. 개별 기록을 내려받지 않는다.
-- 화면 문구는 한국어, 짧고 친근하게. 숫자는 `Intl.NumberFormat('ko-KR')`.
+- 화면 문구는 한국어. 숫자는 `Intl.NumberFormat('ko-KR')`. 폰 너비(375px)에서 가로 스크롤이 생기지 않게 확인한다.
 
 ## 레포의 이전 프로젝트 (구독 정리 사이트)
 
