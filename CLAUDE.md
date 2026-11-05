@@ -45,6 +45,7 @@ Windows에서 경로에 한글이 있으면 `apksigner.bat`이 깨진다. `java 
 
 ## 통계 페이지
 
+- 배포 주소: https://teamjegal.github.io/Money/adsms/ — `.github/workflows/deploy.yml`의 "Add ADyson stats page" 단계가 `adsms/web/index.html`을 `dist/adsms/`로 복사한다. 파일을 추가하면 이 단계도 같이 고친다.
 - 정적 HTML 파일 하나. 빌드 도구·라이브러리 없이 유지한다.
 - `fetch`는 `stats` 엔드포인트에만 쓴다. 다른 외부 API·분석 도구를 붙이지 않는다.
 - 화면 문구는 한국어, 짧고 친근하게. 숫자는 `Intl.NumberFormat('ko-KR')`.

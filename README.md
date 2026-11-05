@@ -47,10 +47,14 @@
 
 ## 통계 페이지
 
-`adsms/web/index.html` — 파일 하나짜리 정적 페이지.
+**배포 주소: https://teamjegal.github.io/Money/adsms/**
+
+`adsms/web/index.html` — 파일 하나짜리 정적 페이지. `main`에 푸시하면 GitHub Actions가 위 주소로 함께 배포한다.
 
 - 총 수신거부 건수 / 사용자 수(고유 설치 ID) / 1인당 평균 처리 건수
 - 30초마다 자동 새로고침, 한국 시간으로 마지막 갱신 시각 표시
+
+로컬에서 볼 때:
 
 ```bash
 python -m http.server 5173 --directory adsms/web   # http://localhost:5173
@@ -77,8 +81,8 @@ adsms/
 
 `src/`, `public/`, `index.html`, `package.json`, `.github/workflows/`, `docs/PLAN.md`는
 이전에 만든 **구독 정리 웹사이트**(Vite + React)다. `main`에 푸시하면 GitHub Actions가
-테스트·빌드 후 `https://teamjegal.github.io/Money/`에 배포한다. ADyson과는 관계없고,
-`adsms/`는 이 빌드·배포에 포함되지 않는다.
+테스트·빌드 후 `https://teamjegal.github.io/Money/`에 배포한다. ADyson과는 관계없다.
+배포 단계에서 ADyson 통계 페이지 하나만 `/Money/adsms/`로 복사해 함께 올린다 (APK는 배포하지 않음).
 
 ```bash
 npm install && npm run dev   # 구독 정리 사이트 로컬 실행 (Node 22.12+)
