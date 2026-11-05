@@ -33,10 +33,10 @@ window.CCUnsub = (() => {
       const r = await res.json().catch(() => ({}));
       if (r.ok) {
         window.CCApp.setDone(item.domain, 'unsub');
-        toast(`✅ <b>${esc(item.service)}</b> 수신거부 완료`, 'ok');
+        toast(`<b>${esc(item.service)}</b> 수신거부 완료`, 'ok');
         return;
       }
-      toast(`⚠ <b>${esc(item.service)}</b> 바로 수신거부 실패: ${esc(r.error || '알 수 없는 오류')}`, 'warn', 8000);
+      toast(`<b>${esc(item.service)}</b> 바로 수신거부 실패: ${esc(r.error || '알 수 없는 오류')}`, 'warn', 8000);
       // 원클릭이 안 되면 같은 링크를 페이지로 열어 직접 마무리할 수 있게
       if (confirm(`${item.service} 바로 수신거부에 실패했어요.\n(${r.error || '오류'})\n\n수신거부 페이지를 새 탭으로 열까요?`)) openPage(item);
     } catch {

@@ -85,6 +85,7 @@
     mode = how;
     store.set(KEY_RESULT, { items, mode, at: Date.now() });
     setStatus(items.length ? `${items.length}곳을 찾았어요.` : emptyMsg);
+    if (items.length) $('other').open = false; // 결과가 첫 화면에 보이도록 입력 칸 접기
     render();
     if (items.length) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -120,11 +121,27 @@
   });
 
   // ---- 화면 그리기 ----
+  const FINDING_EMPTY = '메일함을 불러오면 가입한 서비스를 찾아 위험한 곳부터 보여드려요.';
+  // 제목 아래 한 줄: 지금 가장 먼저 볼 사실
+  function renderFinding(svc) {
+    const el = $('finding');
+    if (!svc.length) { el.textContent = FINDING_EMPTY; return; }
+    const left = svc.filter((x) => !done[x.domain]);
+    const high = left.filter((x) => x.risk === 'high').length;
+    const ads = left.filter((x) => x.marketing_consent).length;
+    if (!left.length) el.textContent = `${svc.length}곳 모두 정리했어요.`;
+    else if (high) el.innerHTML = `아직 광고를 받는 곳 ${ads}곳, 그중 <b>위험 높음 ${high}곳</b>부터 정리하세요.`;
+    else el.textContent = `남은 곳 ${left.length}곳. 광고를 받는 곳은 ${ads}곳이에요.`;
+  }
+
   function render() {
     $('result').hidden = items.length === 0;
+    $('empty-list').hidden = items.length > 0;
+    document.body.classList.toggle('has-result', items.length > 0);
+    const svc = services(), inst = items.filter(isInst);
+    renderFinding(svc);
     if (!items.length) return;
 
-    const svc = services(), inst = items.filter(isInst);
     $('s-total').textContent = svc.length;
     $('s-ads').textContent = svc.filter((x) => x.marketing_consent).length;
     $('s-high').textContent = svc.filter((x) => x.risk === 'high').length;
@@ -157,12 +174,12 @@
             <div class="title-line">
               <span class="name">${esc(x.service)}</span>
               ${isInst(x) ? '<span class="badge inst">기관</span>' : `<span class="badge ${esc(x.risk)}">${RISK_LABEL[x.risk] || esc(x.risk)}</span>`}
-              ${isDone ? `<span class="done-tag">✓ ${done[x.domain] === 'unsub' ? '수신거부 완료' : '완료'}</span>` : ''}
+              ${isDone ? `<span class="done-tag"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>${done[x.domain] === 'unsub' ? '수신거부 완료' : '완료'}</span>` : ''}
             </div>
             <div class="meta">${esc(x.category)} · 마지막 메일 ${esc(x.last_seen || '-')}</div>
           </div>
           <div class="buttons">${buttons}</div>
-          <button class="chev" data-act="toggle" aria-label="자세히 보기" aria-expanded="${open}">▾</button>
+          <button class="chev" data-act="toggle" aria-label="자세히 보기" aria-expanded="${open}"><svg class="ic" aria-hidden="true"><use href="#i-chev"/></svg></button>
         </div>
         <div class="detail">
           <h3>판단 근거</h3>

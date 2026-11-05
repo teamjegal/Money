@@ -61,16 +61,16 @@ window.CCRevoke = (() => {
       if (!failed.length) {
         setDone(item.domain, true);
         const msg = changed.length ? `${summary(changed)} 해제` : (result.note || '이미 모두 꺼져 있어요');
-        setStatus(`✅ ${item.service}: ${msg}`);
-        toast(`✅ <b>${esc(item.service)}</b> · ${esc(msg)}`, 'ok', 6000);
+        setStatus(`${item.service}: ${msg}`);
+        toast(`<b>${esc(item.service)}</b> · ${esc(msg)}`, 'ok', 6000);
       } else {
         const msg = `${changed.length}개 해제, ${failed.length}개는 직접 꺼주세요 (${failed.join(', ')})`;
-        setStatus(`⚠ ${item.service}: ${msg}`, 'error');
-        toast(`⚠ <b>${esc(item.service)}</b> · ${esc(msg)}<br>설정 탭에서 빨간 표시 항목을 꺼 주세요.`, 'warn', 9000);
+        setStatus(`${item.service}: ${msg}`, 'error');
+        toast(`<b>${esc(item.service)}</b> · ${esc(msg)}<br>설정 탭에서 빨간 표시 항목을 꺼 주세요.`, 'warn', 9000);
       }
     } else if (result.status === 'need_login') {
       setStatus('로그인 후 다시 눌러주세요.', 'error');
-      toast('🔒 로그인 후 다시 [AI로 해제]를 눌러주세요.', 'warn');
+      toast('로그인 후 다시 [AI로 해제]를 눌러주세요.', 'warn');
     } else if (result.status === 'cancelled') {
       setStatus(result.reason === 'timeout' ? '응답이 없어 해제를 취소했어요.' : '해제를 취소했어요. 아무것도 바뀌지 않았어요.');
       toast('해제를 취소했어요. 아무것도 바뀌지 않았어요.', 'info');
@@ -89,7 +89,7 @@ window.CCRevoke = (() => {
     const url = item.settings_page || item.homepage || `https://${item.domain}/`;
     const text = item.settings_page ? GUIDE_SETTINGS : GUIDE_TEXT;
     setStatus(`${item.service}: ${text}`);
-    toast(`<b>${esc(item.service)}</b> ${item.settings_page ? '알림 설정 페이지' : '홈페이지'}를 새 탭으로 열어요.<br>${esc(text)}<br><small>처리 결과는 이 체크리스트에 자동으로 ✅ 표시돼요.</small>`, 'info', 12000);
+    toast(`<b>${esc(item.service)}</b> ${item.settings_page ? '알림 설정 페이지' : '홈페이지'}를 새 탭으로 열어요.<br>${esc(text)}<br><small>처리 결과는 이 체크리스트에 자동으로 표시돼요.</small>`, 'info', 12000);
     const r = await CCExt.request('GUIDE', { service: item.service, domain: item.domain, url, settings: !!item.settings_page }, 20000);
     if (r.status !== 'guided') setStatus(`홈페이지를 열지 못했어요: ${r.error || '알 수 없는 오류'}`, 'error');
   }
@@ -105,11 +105,11 @@ window.CCRevoke = (() => {
     const name = item ? item.service : host;
     if (!failed.length && changed.length) {
       if (item) setDone(item.domain, true);
-      setStatus(`✅ ${name}: ${summary(changed)} 해제`);
-      toast(`✅ <b>${esc(name)}</b> · ${esc(summary(changed))} 해제${item ? '' : '<br><small>체크리스트에 이 사이트와 맞는 서비스가 없어 표시만 했어요.</small>'}`, 'ok', 7000);
+      setStatus(`${name}: ${summary(changed)} 해제`);
+      toast(`<b>${esc(name)}</b> · ${esc(summary(changed))} 해제${item ? '' : '<br><small>체크리스트에 이 사이트와 맞는 서비스가 없어 표시만 했어요.</small>'}`, 'ok', 7000);
     } else if (failed.length) {
-      setStatus(`⚠ ${name}: ${changed.length}개 해제, ${failed.length}개는 직접 꺼주세요`, 'error');
-      toast(`⚠ <b>${esc(name)}</b> · ${failed.length}개는 직접 꺼주세요 (${esc(failed.join(', '))})`, 'warn', 9000);
+      setStatus(`${name}: ${changed.length}개 해제, ${failed.length}개는 직접 꺼주세요`, 'error');
+      toast(`<b>${esc(name)}</b> · ${failed.length}개는 직접 꺼주세요 (${esc(failed.join(', '))})`, 'warn', 9000);
     }
   });
 

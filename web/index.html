@@ -7,103 +7,166 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="wrap">
-      <div class="brand">
-        <span class="logo" aria-hidden="true">✓</span>
-        <div>
-          <h1>동의 클리너</h1>
-          <p>메일로 찾는 개인정보 대청소</p>
-        </div>
-        <span class="ext-pill checking" id="ext-status" role="status">확장 프로그램 확인 중…</span>
-      </div>
-      <p class="ext-help" id="ext-help" hidden>
-        [AI로 해제]를 쓰려면 크롬 확장 프로그램이 필요해요.
-        <b>chrome://extensions</b> → 개발자 모드 켜기 → <b>압축해제된 확장 프로그램 로드</b> → 프로젝트의 <b>extension</b> 폴더 선택 후 이 페이지를 새로고침하세요.
-      </p>
+  <!-- 아이콘 모음 (외곽선 16px, 1.5px) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5m6-5v5M7 8h10v3a5 5 0 0 1-10 0V8Zm5 8v5"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="frame topbar-in">
+      <a class="brand" href="/" aria-label="동의 클리너 처음 화면">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="3" y="7" width="26" height="19" rx="3" class="mark-env"/>
+          <path d="m3.5 9 12.5 8.5L28.5 9" class="mark-flap"/>
+          <path d="m11 21.5 3.5 3.5 7-7.5" class="mark-tick"/>
+        </svg>
+        <span class="brand-name">동의 클리너</span>
+        <span class="brand-scope">메일로 찾는 개인정보 대청소</span>
+      </a>
+      <span class="ext-pill checking" id="ext-status" role="status">확장 프로그램 확인 중…</span>
     </div>
   </header>
 
-  <main class="wrap">
-    <!-- 입력 -->
-    <section class="card input-card" aria-labelledby="input-title">
-      <h2 id="input-title">메일함 불러오기</h2>
-      <p class="muted">Gmail은 <b>읽기 전용</b>으로 연결하고 <b>메일 본문은 가져오지 않아요</b>. 보낸 사람·제목·날짜만 확인하고, 서버를 끄면 모두 사라집니다. 비밀번호는 절대 묻지 않습니다.</p>
+  <div class="frame">
+    <p class="notice" id="ext-help" hidden>
+      [AI로 해제]를 쓰려면 크롬 확장 프로그램이 필요해요.
+      <b>chrome://extensions</b> → 개발자 모드 켜기 → <b>압축해제된 확장 프로그램 로드</b> → 프로젝트의 <b>extension</b> 폴더 선택 후 이 페이지를 새로고침하세요.
+    </p>
 
-      <!-- 기본: Gmail -->
-      <div class="gmail-box" id="gmail-box">
-        <div class="gmail-row">
-          <button class="btn primary big" id="gmail-btn">
-            <span class="g-icon" aria-hidden="true">✉</span> Gmail로 분석하기
-          </button>
-          <div class="gmail-info">
-            <span id="gmail-state" class="muted small">연결 상태 확인 중…</span>
-            <button class="btn link small" id="gmail-disconnect" hidden>연결 끊기</button>
+    <div class="title-row">
+      <h1>내 가입처 정리</h1>
+      <p class="finding" id="finding">메일함을 불러오면 가입한 서비스를 찾아 위험한 곳부터 보여드려요.</p>
+    </div>
+
+    <div class="layout">
+      <main class="main-col">
+        <!-- 입력 -->
+        <section class="panel input-card" aria-labelledby="input-title">
+          <div class="panel-head">
+            <h2 id="input-title">메일함 불러오기</h2>
           </div>
-        </div>
-        <div class="gmail-progress" id="gmail-progress" hidden>
-          <div class="progress-head"><span id="gp-text">준비 중…</span><span id="gp-pct"></span></div>
-          <div class="bar"><div class="fill" id="gp-fill"></div></div>
-        </div>
-      </div>
 
-      <!-- 다른 방법: .mbox 업로드·붙여넣기·샘플 -->
-      <details class="other" id="other">
-        <summary>다른 방법: .mbox 파일 · 메일 붙여넣기 · 샘플</summary>
-      <div class="input-grid">
-        <label class="drop" id="drop">
-          <input type="file" id="file" accept=".mbox,.eml,.txt,text/plain">
-          <span class="drop-icon" aria-hidden="true">📥</span>
-          <span class="drop-text" id="file-label"><b>.mbox 파일 선택</b><br>또는 여기로 끌어다 놓기</span>
-        </label>
-        <div class="paste">
-          <label for="paste" class="sr-only">메일 붙여넣기</label>
-          <textarea id="paste" placeholder="또는 메일 내용을 붙여넣기&#10;&#10;보낸사람: 데모쇼핑 &lt;ad@demo-shop.example&gt;&#10;제목: (광고) 가을 맞이 할인&#10;&#10;본문..."></textarea>
-        </div>
-      </div>
+          <div class="gmail-row">
+            <button class="btn primary big" id="gmail-btn">
+              <svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Gmail로 분석하기
+            </button>
+            <div class="gmail-info">
+              <span id="gmail-state" class="muted small">연결 상태 확인 중…</span>
+              <button class="btn link small" id="gmail-disconnect" hidden>연결 끊기</button>
+            </div>
+          </div>
+          <div class="gmail-progress" id="gmail-progress" hidden>
+            <div class="progress-head"><span id="gp-text">준비 중…</span><span class="num" id="gp-pct"></span></div>
+            <div class="bar"><div class="fill" id="gp-fill"></div></div>
+          </div>
 
-      <div class="actions">
-        <button class="btn" id="analyze">이 파일로 분석하기</button>
-        <button class="btn ghost" id="sample">샘플 메일함으로 해보기</button>
-      </div>
-      </details>
-      <p class="status" id="status" role="status" aria-live="polite"></p>
-    </section>
+          <!-- 다른 방법: .mbox 업로드·붙여넣기·샘플 -->
+          <details class="other" id="other">
+            <summary><svg class="ic chev-ic" aria-hidden="true"><use href="#i-chev"/></svg>다른 방법: .mbox 파일 · 메일 붙여넣기 · 샘플</summary>
+            <div class="input-grid">
+              <label class="drop" id="drop">
+                <input type="file" id="file" accept=".mbox,.eml,.txt,text/plain">
+                <svg class="ic drop-icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                <span class="drop-text" id="file-label"><b>.mbox 파일 선택</b><br>또는 여기로 끌어다 놓기</span>
+              </label>
+              <div class="paste">
+                <label for="paste" class="field-label">메일 붙여넣기</label>
+                <textarea id="paste" placeholder="보낸사람: 데모쇼핑 &lt;ad@demo-shop.example&gt;&#10;제목: (광고) 가을 맞이 할인&#10;&#10;본문..."></textarea>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn" id="analyze">이 파일로 분석하기</button>
+              <button class="btn" id="sample">샘플 메일함으로 해보기</button>
+            </div>
+          </details>
+          <p class="status" id="status" role="status" aria-live="polite"></p>
+        </section>
 
-    <!-- 결과 -->
-    <section id="result" hidden>
-      <div class="summary">
-        <div class="stat"><span class="num" id="s-total">0</span><span class="label">가입처</span></div>
-        <div class="stat"><span class="num" id="s-ads">0</span><span class="label">광고 수신 중</span></div>
-        <div class="stat danger"><span class="num" id="s-high">0</span><span class="label">위험도 높음</span></div>
-      </div>
+        <!-- 첫 화면: 결과가 들어올 자리 (예시 줄) -->
+        <section class="panel list-panel empty-list" id="empty-list" aria-labelledby="empty-title">
+          <div class="panel-head">
+            <h2 id="empty-title">위험한 곳부터 정리하기</h2>
+            <span class="muted small">예시</span>
+          </div>
+          <p class="empty-note">메일함을 불러오면 이 자리에 가입처가 위험한 순서로 쌓여요. 하나씩 해제하면 진행률이 올라갑니다.</p>
+          <ul class="list example" aria-label="결과 예시">
+            <li class="item"><div class="row"><span class="check-spacer"></span><div class="main"><div class="title-line"><span class="name">데모쇼핑</span><span class="badge high">위험 높음</span></div><div class="meta">쇼핑 · 광고 10건 · 마지막 주문 2024-01</div></div></div></li>
+            <li class="item"><div class="row"><span class="check-spacer"></span><div class="main"><div class="title-line"><span class="name">배움상자</span><span class="badge high">위험 높음</span></div><div class="meta">교육 · 휴면 전환 안내 받음</div></div></div></li>
+            <li class="item"><div class="row"><span class="check-spacer"></span><div class="main"><div class="title-line"><span class="name">시네마루</span><span class="badge medium">보통</span></div><div class="meta">영화 · 광고 수신 중, 가끔 예매</div></div></div></li>
+            <li class="item"><div class="row"><span class="check-spacer"></span><div class="main"><div class="title-line"><span class="name">꿀딜마트</span><span class="badge medium">보통</span></div><div class="meta">쇼핑 · 광고 4건, 올해 주문 1건</div></div></div></li>
+            <li class="item"><div class="row"><span class="check-spacer"></span><div class="main"><div class="title-line"><span class="name">동네은행</span><span class="badge low">낮음</span></div><div class="meta">금융 · 거래 안내 메일만 옴</div></div></div></li>
+          </ul>
+        </section>
 
-      <div class="card progress-card">
-        <div class="progress-head">
-          <span>정리 진행률</span>
-          <span><b id="p-done">0</b> / <span id="p-total">0</span> 완료</span>
-        </div>
-        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
-          <div class="fill" id="fill"></div>
-        </div>
-      </div>
+        <!-- 결과 -->
+        <section id="result" aria-labelledby="list-title" hidden>
+          <div class="panel kpis">
+            <div class="kpi"><span class="kpi-label">가입처</span><span class="kpi-value num"><span id="s-total">0</span><small>곳</small></span></div>
+            <div class="kpi"><span class="kpi-label">광고 수신 중</span><span class="kpi-value num"><span id="s-ads">0</span><small>곳</small></span></div>
+            <div class="kpi danger"><span class="kpi-label">위험 높음</span><span class="kpi-value num"><span id="s-high">0</span><small>곳</small></span></div>
+            <div class="kpi progress">
+              <span class="kpi-label">정리 진행</span>
+              <span class="kpi-value num"><b id="p-done">0</b><small> / <span id="p-total">0</span>곳</small></span>
+              <div class="bar" role="progressbar" aria-label="정리 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
+                <div class="fill" id="fill"></div>
+              </div>
+            </div>
+          </div>
 
-      <div class="list-head">
-        <h2>내 가입처 체크리스트</h2>
-        <span class="muted small" id="mode"></span>
-      </div>
-      <ul class="list" id="list"></ul>
+          <div class="panel list-panel">
+            <div class="panel-head">
+              <h2 id="list-title">위험한 곳부터 정리하기</h2>
+              <span class="muted small" id="mode"></span>
+            </div>
+            <ul class="list" id="list"></ul>
+          </div>
 
-      <details class="inst" id="inst" hidden>
-        <summary>학교·공공기관·회사 메일 <b id="inst-count">0</b>곳 <span class="muted small">(해제 대상 아님)</span></summary>
-        <ul class="list" id="inst-list"></ul>
-      </details>
+          <details class="inst" id="inst" hidden>
+            <summary><svg class="ic chev-ic" aria-hidden="true"><use href="#i-chev"/></svg>학교·공공기관·회사 메일 <b id="inst-count">0</b>곳 <span class="muted small">해제 대상이 아니에요</span></summary>
+            <ul class="list panel" id="inst-list"></ul>
+          </details>
 
-      <div class="foot">
-        <button class="btn link" id="reset">결과 지우기</button>
-      </div>
-    </section>
-  </main>
+          <div class="foot">
+            <button class="btn link" id="reset">결과 지우기</button>
+          </div>
+        </section>
+      </main>
+
+      <!-- 읽는 것 / 읽지 않는 것 -->
+      <aside class="rail" aria-labelledby="scope-title">
+        <section class="panel scope">
+          <div class="panel-head"><h2 id="scope-title">메일에서 보는 것</h2></div>
+          <ul class="scope-list">
+            <li class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>보낸 사람</span><span class="eg">데모쇼핑 · demo-shop.example</span></li>
+            <li class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>제목</span><span class="eg">(광고) 가을 맞이 할인</span></li>
+            <li class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>받은 날짜</span><span class="eg">2026-10-20</span></li>
+            <li class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>수신거부 링크</span><span class="eg">List-Unsubscribe 헤더</span></li>
+          </ul>
+          <h3 class="scope-sub">보지 않는 것</h3>
+          <ul class="scope-list">
+            <li class="no"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span>메일 본문과 첨부파일</span></li>
+            <li class="no"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span>비밀번호, 로그인 정보</span></li>
+            <li class="no"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span>AI에게 내 메일 주소</span></li>
+          </ul>
+        </section>
+
+        <section class="panel rules" aria-labelledby="rules-title">
+          <div class="panel-head"><h2 id="rules-title">해제할 때 지키는 것</h2></div>
+          <dl class="kv">
+            <div><dt>Gmail 권한</dt><dd>읽기 전용</dd></div>
+            <div><dt>저장 위치</dt><dd>서버 메모리, 끄면 삭제</dd></div>
+            <div><dt>클릭 전</dt><dd>항목마다 내가 승인</dd></div>
+            <div class="stack"><dt>절대 안 누르는 버튼</dt><dd>탈퇴 · 결제 · 삭제 · 로그아웃</dd></div>
+          </dl>
+        </section>
+      </aside>
+    </div>
+  </div>
 
   <script src="ext.js"></script>
   <script src="unsub.js"></script>

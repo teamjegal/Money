@@ -27,7 +27,7 @@
       btn.disabled = true;
       $('other').open = true;
     } else if (status.connected) {
-      st.textContent = `● 연결됨: ${status.email || 'Gmail'} (읽기 전용)`;
+      st.textContent = `연결됨: ${status.email || 'Gmail'} (읽기 전용)`;
       btn.disabled = polling;
     } else {
       st.textContent = '구글 로그인 화면에서 직접 로그인해요. 읽기 권한만 요청합니다.';
